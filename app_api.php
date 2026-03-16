@@ -77,29 +77,24 @@ try {
     // =========================================================
     if ($action === 'get_dashboard') {
         try {
-            // 1. Controllo di sicurezza: la funzione esiste?
-            if (!function_exists('getUserHistory')) {
-                echo json_encode(['error' => 'La funzione getUserHistory() manca nel file functions.php!']);
+            if (!function_exists('getUserMonthlyStats')) {
+                echo json_encode(['error' => 'La funzione getUserMonthlyStats() manca in functions.php!']);
                 exit;
             }
 
-            // 2. Proviamo a estrarre lo storico
-            $history = getUserHistory($user_id);
+            // Calcola le statistiche mensili
+            $stats = getUserMonthlyStats($user_id);
 
-            // 3. Stampiamo i dati
             echo json_encode([
                 'saldo' => $user['saldo_kwh'] ?? 0,
                 'karma' => $user['trust_score'] ?? 0,
                 'is_premium' => $user['is_premium'] ?? 0,
-                'history' => $history ?: []
+                'monthly_stats' => $stats
             ]);
             exit;
 
         } catch (\Throwable $e) {
-            // 🚨 CATTURA QUALSIASI CRASH (Database, Errori di sintassi, ecc.)
-            echo json_encode([
-                'error' => 'CRASH PHP: ' . $e->getMessage() . ' nel file ' . basename($e->getFile()) . ' alla riga ' . $e->getLine()
-            ]);
+            echo json_encode(['error' => 'CRASH PHP: ' . $e->getMessage()]);
             exit;
         }
     }
