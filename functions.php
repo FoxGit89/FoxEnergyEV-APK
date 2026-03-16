@@ -16,7 +16,7 @@ function db() {
 }
 
 /**
- * Calcola i totali del Mese Corrente per Energia, Consumi e Ricariche Wallet
+ * Calcola i totali del Mese Corrente leggendo dalle VERE tabelle in produzione.
  */
 function getUserMonthlyStats($telegram_id) {
     $stats = [
@@ -34,7 +34,15 @@ function getUserMonthlyStats($telegram_id) {
     // 1. Somma Ricariche Wallet (Tabella: wallet_recharges)
     // =========================================================
     try {
-        $stmt1 = $pdo->prepare("SELECT SUM(amount) as total FROM wallet_recharges WHERE user_id = ? AND status = 'CONFIRMED' AND DATE_FORMAT(created_at, '%Y-%m') = ?");
+        // Uso una JOIN corazzata nel caso la FK punti all'ID interno invece che al telegram_id
+        $stmt1 = $pdo->prepare("
+            SELECT SUM(w.amount) as total 
+            FROM wallet_recharges w
+            JOIN users u ON (w.user_id = u.id OR w.user_id = u.telegram_id)
+            WHERE u.telegram_id = ? 
+            AND w.status = 'CONFIRMED' 
+            AND DATE_FORMAT(w.created_at, '%Y-%m') = ?
+        ");
         $stmt1->execute([$telegram_id, $current_month]);
         $res1 = $stmt1->fetch(PDO::FETCH_ASSOC);
         
@@ -46,19 +54,19 @@ function getUserMonthlyStats($telegram_id) {
     }
 
     // =========================================================
-    // 2. Somma Consumi e Spesa (Tabella: transactions)
+    // 2. Somma Consumi ed Euro (Tabella REALE: transactions)
     // =========================================================
     try {
-        // ⚠️ NOTA: Assumo che in 'transactions' le colonne si chiamino 'kwh_consumed', 'cost' e 'created_at'.
-        // Se hai usato nomi diversi (es. 'importo', 'kwh', 'end_time'), aggiornali qui sotto!
+        // Leggiamo dalle colonne corrette: kwh e importo_eur
         $stmt2 = $pdo->prepare("
             SELECT 
-                SUM(kwh_consumed) as tot_kwh, 
-                SUM(cost) as tot_eur 
-            FROM transactions 
-            WHERE user_id = ? 
-            AND status IN ('completed', 'closed', 'finished') 
-            AND DATE_FORMAT(created_at, '%Y-%m') = ?
+                SUM(t.kwh) as tot_kwh, 
+                SUM(t.importo_eur) as tot_eur 
+            FROM transactions t
+            JOIN users u ON (t.user_id = u.id OR t.user_id = u.telegram_id)
+            WHERE u.telegram_id = ? 
+            AND t.status = 'CONFIRMED' 
+            AND DATE_FORMAT(t.created_at, '%Y-%m') = ?
         ");
         
         $stmt2->execute([$telegram_id, $current_month]);
@@ -72,7 +80,6 @@ function getUserMonthlyStats($telegram_id) {
         $errori[] = "Errore Transactions: " . $e->getMessage();
     }
 
-    // Se c'è stato un problema di nomi di colonne, lo vedremo nella console di Flutter!
     if (!empty($errori)) {
         $stats['debug_msg'] = implode(" | ", $errori);
     }
