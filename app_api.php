@@ -11,29 +11,36 @@ header('Access-Control-Allow-Origin: *');
 $action = $_GET['action'] ?? '';
 
 // =========================================================
-// 1. GESTIONE LOGIN (Con controllo Licenza)
+// 1. GESTIONE LOGIN (Con Username + Numero Tessera)
 // =========================================================
 if ($action === 'login') {
     $input = $_GET['username'] ?? '';
     $input = ltrim(trim($input), '@');
+    $card = $_GET['card_number'] ?? ''; // <--- NUOVO CAMPO
     
-    $stmt = db()->prepare("SELECT telegram_id, first_name FROM users WHERE username = ? OR telegram_id = ?");
-    $stmt->execute([$input, $input]);
+    if (empty($card)) {
+        echo json_encode(['success' => false, 'error' => 'Inserisci il Numero della tua Tessera Fox Energy.']);
+        exit;
+    }
+
+    // 🕵️‍♂️ Controllo incrociato: Username/ID + Numero Tessera
+    $stmt = db()->prepare("SELECT telegram_id, first_name FROM users WHERE (username = ? OR telegram_id = ?) AND card_number = ?");
+    $stmt->execute([$input, $input, $card]);
     $u = $stmt->fetch(PDO::FETCH_ASSOC);
     
     if ($u) {
-        // Controllo se l'utente è stato bloccato (tollerante se la colonna non esiste ancora)
+        // Controllo se l'utente è stato bloccato dal Kill-Switch
         try {
             $lic_check = db()->query("SELECT app_access FROM users WHERE telegram_id = " . db()->quote($u['telegram_id']))->fetchColumn();
             if ($lic_check !== false && $lic_check == 0) {
-                echo json_encode(['success' => false, 'error' => 'Licenza App scaduta o revocata. Contatta Fox Energy.']);
+                echo json_encode(['success' => false, 'error' => 'Licenza INFOSYNC scaduta o revocata.']);
                 exit;
             }
         } catch (Exception $e) {}
 
         echo json_encode(['success' => true, 'telegram_id' => $u['telegram_id'], 'first_name' => $u['first_name']]);
     } else {
-        echo json_encode(['success' => false, 'error' => 'Utente non trovato nel Database. Verifica lo Username.']);
+        echo json_encode(['success' => false, 'error' => 'Credenziali errate. Verifica Username e Numero Tessera.']);
     }
     exit;
 }
