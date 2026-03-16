@@ -11,6 +11,24 @@ if (empty($user_id)) {
     exit;
 }
 
+// --- NUOVA AZIONE: LOGIN DA APP ---
+if ($action == 'login') {
+    $input = $_GET['username'] ?? '';
+    $input = ltrim($input, '@'); // Toglie la @ se l'utente la scrive
+    
+    // Cerca l'utente sia per username che per Telegram ID
+    $stmt = db()->prepare("SELECT telegram_id, first_name FROM users WHERE username = ? OR telegram_id = ?");
+    $stmt->execute([$input, $input]);
+    $u = $stmt->fetch(PDO::FETCH_ASSOC);
+    
+    if ($u) {
+        echo json_encode(['success' => true, 'telegram_id' => $u['telegram_id'], 'first_name' => $u['first_name']]);
+    } else {
+        echo json_encode(['success' => false, 'error' => 'Utente non trovato. Verifica lo Username.']);
+    }
+    exit;
+}
+
 $user = db()->query("SELECT * FROM users WHERE telegram_id = " . db()->quote($user_id))->fetch(PDO::FETCH_ASSOC);
 
 if (!$user) {
