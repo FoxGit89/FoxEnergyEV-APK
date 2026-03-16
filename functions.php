@@ -16,16 +16,18 @@ function db() {
 }
 
 /**
- * Estrae lo storico unificato delle Ricariche e dei Consumi di un utente.
+ * Estrae lo storico unificato delle Ricariche e delle Prenotazioni di un utente.
  */
 function getUserHistory($telegram_id) {
     $history = [];
     $pdo = db();
 
+    // =========================================================
+    // 1. ESTRAZIONE RICARICHE WALLET (Tabella: wallet_recharges)
+    // =========================================================
     try {
-        // 1. Estrazione Ricariche (Wallet)
-        // Assumo che la tabella si chiami 'wallet_recharges' e abbia le colonne: amount, created_at, status
-        $stmt_recharges = $pdo->prepare("SELECT amount, created_at, status FROM wallet_recharges WHERE telegram_id = ? ORDER BY created_at DESC LIMIT 10");
+        // Usiamo 'user_id' come da schema
+        $stmt_recharges = $pdo->prepare("SELECT amount, created_at, status, method_key FROM wallet_recharges WHERE user_id = ? AND status = 'CONFIRMED' ORDER BY created_at DESC LIMIT 10");
         $stmt_recharges->execute([$telegram_id]);
         $recharges = $stmt_recharges->fetchAll(PDO::FETCH_ASSOC);
 
@@ -34,43 +36,48 @@ function getUserHistory($telegram_id) {
                 'tipo' => 'RICARICA',
                 'val' => number_format((float)$r['amount'], 2),
                 'data' => $r['created_at'],
-                'status' => $r['status'] ?? 'Completata',
-                'info' => 'Ricarica Wallet',
+                'status' => $r['status'],
+                'info' => 'Ricarica ' . ($r['method_key'] ?? 'Wallet'),
                 'icon' => '➕'
             ];
         }
     } catch (Exception $e) {
-        // Ignora se la tabella non esiste
+        // Errore silenzioso, passiamo oltre
     }
 
+    // =========================================================
+    // 2. ESTRAZIONE PRENOTAZIONI / CONSUMI (Tabella: bookings)
+    // =========================================================
     try {
-        // 2. Estrazione Consumi (Transazioni/Ricariche veicolo)
-        // Assumo che la tabella si chiami 'transactions' o 'bookings' e abbia le colonne: cost, kwh_consumed, end_time, status
-        $stmt_trans = $pdo->prepare("SELECT cost, kwh_consumed, end_time, status FROM transactions WHERE telegram_id = ? AND status IN ('completed', 'closed') ORDER BY end_time DESC LIMIT 10");
+        // Usiamo 'user_id' e filtriamo per status conclusi. 
+        // Poiché non c'è un 'cost' nella tabella, usiamo service_name e slot.
+        $stmt_trans = $pdo->prepare("SELECT service_name, slot, created_at, status FROM bookings WHERE user_id = ? AND status IN ('completed', 'finished') ORDER BY created_at DESC LIMIT 10");
         $stmt_trans->execute([$telegram_id]);
         $transactions = $stmt_trans->fetchAll(PDO::FETCH_ASSOC);
 
         foreach ($transactions as $t) {
             $history[] = [
                 'tipo' => 'CONSUMO',
-                'val' => number_format((float)$t['cost'], 2),
-                'kwh' => $t['kwh_consumed'] ?? '0.0',
-                'data' => $t['end_time'],
-                'status' => $t['status'],
-                'info' => 'Ricarica Veicolo',
+                'val' => '--', // Nessun costo monetario loggato in bookings
+                'kwh' => $t['service_name'] ?? 'Colonnina', // Mostriamo l'operatore al posto dei kWh
+                'data' => $t['created_at'],
+                'status' => strtoupper($t['status']),
+                'info' => 'Slot: ' . ($t['slot'] ?? 'N/D'),
                 'icon' => '➖'
             ];
         }
     } catch (Exception $e) {
-        // Ignora se la tabella non esiste
+        // Errore silenzioso, passiamo oltre
     }
 
-    // Ordina tutto per data dal più recente al più vecchio
+    // =========================================================
+    // ORDINAMENTO E MERGE FINALE
+    // =========================================================
+    // Ordina per data decrescente (dal più recente al più vecchio)
     usort($history, function($a, $b) {
         return strtotime($b['data']) - strtotime($a['data']);
     });
 
-    // Ritorna solo gli ultimi 15 movimenti per non appesantire l'App
     return array_slice($history, 0, 15);
 }
 ?>
