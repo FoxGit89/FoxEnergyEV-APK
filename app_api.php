@@ -73,6 +73,29 @@ try {
     }
 
     // =========================================================
+    // 2.5 DASHBOARD FINANZIARIA & STORICO TRANSAZIONI
+    // =========================================================
+    if ($action === 'get_dashboard') {
+        $u_data = db()->query("SELECT saldo_kwh, trust_score, is_premium FROM users WHERE telegram_id = " . db()->quote($user_id))->fetch(PDO::FETCH_ASSOC);
+        
+        if (!$u_data) {
+            echo json_encode(['error' => 'Utente non trovato']);
+            exit;
+        }
+
+        // Richiamiamo la tua funzione nativa da functions.php
+        $history = getUserHistory($user_id);
+
+        echo json_encode([
+            'saldo' => $u_data['saldo_kwh'] ?? '0.00',
+            'karma' => $u_data['trust_score'] ?? '0',
+            'is_premium' => $u_data['is_premium'] ?? '0',
+            'history' => $history ?: []
+        ]);
+        exit;
+    }
+
+    // =========================================================
     // 3. INVIO LISTA SLOT AUTORIZZATI
     // =========================================================
     if ($action === 'get_slots') {
