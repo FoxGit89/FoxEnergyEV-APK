@@ -16,68 +16,41 @@ function db() {
 }
 
 /**
- * Estrae lo storico unificato delle Ricariche e delle Prenotazioni di un utente.
+ * Calcola i totali del Mese Corrente per Energia, Consumi e Ricariche Wallet
  */
-function getUserHistory($telegram_id) {
-    $history = [];
+function getUserMonthlyStats($telegram_id) {
+    $stats = [
+        'energy_kwh' => '0.00',
+        'spent_eur' => '0.00',
+        'recharged_eur' => '0.00'
+    ];
+    
     $pdo = db();
+    $current_month = date('Y-m'); // Es. "2026-03"
 
-    // =========================================================
-    // 1. ESTRAZIONE RICARICHE WALLET (Tabella: wallet_recharges)
-    // =========================================================
+    // 1. Somma Ricariche Wallet (Euro)
     try {
-        // Usiamo 'user_id' come da schema
-        $stmt_recharges = $pdo->prepare("SELECT amount, created_at, status, method_key FROM wallet_recharges WHERE user_id = ? AND status = 'CONFIRMED' ORDER BY created_at DESC LIMIT 10");
-        $stmt_recharges->execute([$telegram_id]);
-        $recharges = $stmt_recharges->fetchAll(PDO::FETCH_ASSOC);
-
-        foreach ($recharges as $r) {
-            $history[] = [
-                'tipo' => 'RICARICA',
-                'val' => number_format((float)$r['amount'], 2),
-                'data' => $r['created_at'],
-                'status' => $r['status'],
-                'info' => 'Ricarica ' . ($r['method_key'] ?? 'Wallet'),
-                'icon' => '➕'
-            ];
+        $stmt1 = $pdo->prepare("SELECT SUM(amount) as total FROM wallet_recharges WHERE user_id = ? AND status = 'CONFIRMED' AND DATE_FORMAT(created_at, '%Y-%m') = ?");
+        $stmt1->execute([$telegram_id, $current_month]);
+        $res1 = $stmt1->fetch(PDO::FETCH_ASSOC);
+        if ($res1 && $res1['total']) {
+            $stats['recharged_eur'] = number_format((float)$res1['total'], 2, '.', '');
         }
-    } catch (Exception $e) {
-        // Errore silenzioso, passiamo oltre
-    }
+    } catch (Exception $e) {}
 
-    // =========================================================
-    // 2. ESTRAZIONE PRENOTAZIONI / CONSUMI (Tabella: bookings)
-    // =========================================================
+    // 2. Somma Consumi (Energia in kWh ed Euro spesi alla colonnina)
+    // ⚠️ IMPORTANTE: Assumo che nella tabella bookings tu abbia le colonne 'kwh_consumed' e 'cost'.
+    // Se non le hai, o se scali l'energia in modo diverso, fammelo sapere.
     try {
-        // Usiamo 'user_id' e filtriamo per status conclusi. 
-        // Poiché non c'è un 'cost' nella tabella, usiamo service_name e slot.
-        $stmt_trans = $pdo->prepare("SELECT service_name, slot, created_at, status FROM bookings WHERE user_id = ? AND status IN ('completed', 'finished') ORDER BY created_at DESC LIMIT 10");
-        $stmt_trans->execute([$telegram_id]);
-        $transactions = $stmt_trans->fetchAll(PDO::FETCH_ASSOC);
-
-        foreach ($transactions as $t) {
-            $history[] = [
-                'tipo' => 'CONSUMO',
-                'val' => '--', // Nessun costo monetario loggato in bookings
-                'kwh' => $t['service_name'] ?? 'Colonnina', // Mostriamo l'operatore al posto dei kWh
-                'data' => $t['created_at'],
-                'status' => strtoupper($t['status']),
-                'info' => 'Slot: ' . ($t['slot'] ?? 'N/D'),
-                'icon' => '➖'
-            ];
+        $stmt2 = $pdo->prepare("SELECT SUM(kwh_consumed) as tot_kwh, SUM(cost) as tot_eur FROM bookings WHERE user_id = ? AND status IN ('completed', 'finished') AND DATE_FORMAT(created_at, '%Y-%m') = ?");
+        $stmt2->execute([$telegram_id, $current_month]);
+        $res2 = $stmt2->fetch(PDO::FETCH_ASSOC);
+        if ($res2) {
+            if ($res2['tot_kwh']) $stats['energy_kwh'] = number_format((float)$res2['tot_kwh'], 2, '.', '');
+            if ($res2['tot_eur']) $stats['spent_eur'] = number_format((float)$res2['tot_eur'], 2, '.', '');
         }
-    } catch (Exception $e) {
-        // Errore silenzioso, passiamo oltre
-    }
+    } catch (Exception $e) {}
 
-    // =========================================================
-    // ORDINAMENTO E MERGE FINALE
-    // =========================================================
-    // Ordina per data decrescente (dal più recente al più vecchio)
-    usort($history, function($a, $b) {
-        return strtotime($b['data']) - strtotime($a['data']);
-    });
-
-    return array_slice($history, 0, 15);
+    return $stats;
 }
 ?>
