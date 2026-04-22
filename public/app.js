@@ -1,4 +1,4 @@
-const API_BASE = "https://foxenergyev-apk-production.up.railway.app/app_api.php";
+const API_BASE = "/app_api.php";
 
 const app = {
   // State
@@ -38,7 +38,7 @@ const app = {
 
   // API Call helper
   async apiCall(params) {
-    const url = new URL(API_BASE);
+    const url = new URL(API_BASE, window.location.origin);
     Object.keys(params).forEach(k => url.searchParams.append(k, params[k]));
     try {
       const controller = new AbortController();
@@ -132,11 +132,11 @@ const app = {
     try {
       const [dashData, cardsData] = await Promise.all([
         this.apiCall({ action: 'get_dashboard', user_id: this.user.telegramId }),
-        this.apiCall({ action: 'get_cards', user_id: this.user.telegramId })
+        this.apiCall({ action: 'get_slots', user_id: this.user.telegramId })
       ]);
 
       this.dashboard = dashData;
-      this.cards = cardsData.success && Array.isArray(cardsData.cards) ? cardsData.cards : [];
+      this.cards = Array.isArray(cardsData) ? cardsData : [];
 
       this.renderDashboard();
       this.renderSlots();
@@ -149,7 +149,7 @@ const app = {
   },
 
   renderDashboard() {
-    const bal = parseFloat(this.dashboard.balance || 0);
+    const bal = parseFloat(this.dashboard.saldo || 0);
     const isPremium = !!this.dashboard.is_premium;
     const isLow = bal < 2.0;
 
