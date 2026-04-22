@@ -55,19 +55,52 @@ const app = {
       clearTimeout(timeoutId);
 
       const text = await res.text(); // Leggiamo come testo prima per debug
+      console.log(`[API RESPONSE - ${params.action}] Status: ${res.status}\nRaw Text:`, text);
 
       if (!res.ok) {
-         throw new Error(`Server returned ${res.status}: ${text.substring(0, 50)}`);
+         throw new Error(`Server returned ${res.status}: ${text.substring(0, 80)}`);
       }
 
       try {
-        return JSON.parse(text);
+        if (text.trim() === '') {
+             throw new Error('Risposta vuota dal server.');
+        }
+
+        // Prima cerchiamo di parsare l'intera stringa in modo standard
+        try {
+            return JSON.parse(text);
+        } catch (e) {
+            // Se fallisce, cerchiamo il primo '{' o '[' per pulire l'output da eventuali warning PHP
+            const firstBrace = text.indexOf('{');
+            const firstBracket = text.indexOf('[');
+
+            let startIndex = -1;
+            if (firstBrace !== -1 && firstBracket !== -1) {
+                startIndex = Math.min(firstBrace, firstBracket);
+            } else if (firstBrace !== -1) {
+                startIndex = firstBrace;
+            } else if (firstBracket !== -1) {
+                startIndex = firstBracket;
+            }
+
+            if (startIndex !== -1) {
+                // Troviamo l'ultima parentesi corrispondente
+                const isArray = text[startIndex] === '[';
+                const lastIndex = isArray ? text.lastIndexOf(']') : text.lastIndexOf('}');
+
+                if (lastIndex !== -1 && startIndex < lastIndex) {
+                    const cleanJsonStr = text.substring(startIndex, lastIndex + 1);
+                    return JSON.parse(cleanJsonStr);
+                }
+            }
+            throw e; // Rilanciamo se non riusciamo a salvarlo
+        }
       } catch (parseError) {
-        throw new Error(`Il server non ha restituito JSON valido. Raw: ${text.substring(0, 80)}...`);
+        throw new Error(`Invalid JSON. Raw: ${text.substring(0, 100)}...`);
       }
 
     } catch (e) {
-      console.error('API Error details:', e);
+      console.error(`[API ERROR - ${params.action}]:`, e);
       throw e;
     }
   },
