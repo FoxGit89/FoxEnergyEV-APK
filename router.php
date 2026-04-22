@@ -14,9 +14,10 @@ if (strpos($path, '..') !== false) {
 // Check if the path exists in the root directory (e.g. app_api.php, functions.php)
 $rootPath = realpath(__DIR__ . $path);
 if ($rootPath && is_file($rootPath) && dirname($rootPath) === __DIR__) {
-    // Only allow specific root files to be executed directly if needed
-    // or let the built-in server handle it
-    return false;
+    // Only allow specific root PHP files to be executed directly
+    if (pathinfo($rootPath, PATHINFO_EXTENSION) === 'php') {
+        return false;
+    }
 }
 
 if ($path === '/' || $path === '') {
