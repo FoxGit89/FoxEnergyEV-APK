@@ -135,6 +135,13 @@ const app = {
         this.apiCall({ action: 'get_slots', user_id: this.user.telegramId })
       ]);
 
+      if (dashData.error) {
+        throw new Error("DASHBOARD: " + dashData.error);
+      }
+      if (cardsData.error) {
+         throw new Error("SLOTS: " + cardsData.error);
+      }
+
       this.dashboard = dashData;
       this.cards = Array.isArray(cardsData) ? cardsData : [];
 
@@ -143,7 +150,7 @@ const app = {
       this.showScreen('dashboard-screen');
     } catch (e) {
       console.error(e);
-      alert("Errore nel caricamento della dashboard.");
+      alert(`Errore di caricamento:\n${e.message || "Connessione fallita."}`);
       this.logout();
     }
   },
