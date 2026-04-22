@@ -38,17 +38,36 @@ const app = {
 
   // API Call helper
   async apiCall(params) {
-    const url = new URL(API_BASE, window.location.origin);
-    Object.keys(params).forEach(k => url.searchParams.append(k, params[k]));
+    const url = window.location.origin + API_BASE;
+    // Append parameters to URL
+    const queryString = Object.keys(params).map(k => `${encodeURIComponent(k)}=${encodeURIComponent(params[k])}`).join('&');
+    const fullUrl = `${url}?${queryString}`;
+
     try {
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
-      const res = await fetch(url, { signal: controller.signal });
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
+      const res = await fetch(fullUrl, {
+        method: 'GET',
+        headers: { 'Accept': 'application/json' },
+        signal: controller.signal
+      });
       clearTimeout(timeoutId);
-      if (!res.ok) throw new Error(`HTTP error! status: ${res.status}`);
-      return await res.json();
+
+      const text = await res.text(); // Leggiamo come testo prima per debug
+
+      if (!res.ok) {
+         throw new Error(`Server returned ${res.status}: ${text.substring(0, 50)}`);
+      }
+
+      try {
+        return JSON.parse(text);
+      } catch (parseError) {
+        throw new Error(`Il server non ha restituito JSON valido. Raw: ${text.substring(0, 80)}...`);
+      }
+
     } catch (e) {
-      console.error('API Error:', e);
+      console.error('API Error details:', e);
       throw e;
     }
   },
