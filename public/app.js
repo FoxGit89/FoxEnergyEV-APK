@@ -401,18 +401,43 @@ window.bleEngine = {
            const parsedResp = ChameleonUltra.mf1DumpFromPm3Json(res);
            dumpData = parsedResp;
         } catch (err) {
-           console.warn(`Fallback al vecchio parser JSON per slot ${slotIdx + 1}`, err);
-           // Fallback for custom JSON structures that don't perfectly match PM3
-           dumpData = {
-               uid: Buffer.from(res.uid.replace(/\s+/g,''), 'hex'),
-               atqa: Buffer.from(Array.isArray(res.atqa) ? res.atqa.map(x=>x.toString(16).padStart(2,'0')).join('') : res.atqa.replace(/\s+/g,''), 'hex').reverse(),
-               sak: Buffer.from([res.sak]),
-               ats: res.ats ? Buffer.from(res.ats.replace(/\s+/g,''), 'hex') : Buffer.alloc(0),
-               body: Buffer.from(res.data ? res.data.join('').replace(/\s+/g,'') : '', 'hex')
+           console.warn(`Fallback al parser manuale per slot ${slotIdx + 1}`);
+           // Helper to convert unknown string/array to Buffer safely
+           const toBuffer = (val, isLittleEndian = false) => {
+               if (!val) return Buffer.alloc(0);
+               if (Array.isArray(val)) {
+                   if (val.length === 0) return Buffer.alloc(0);
+                   if (typeof val[0] === 'string') {
+                       // Array of hex strings (e.g. data blocks)
+                       const joined = val.join('').replace(/\s+/g,'');
+                       return Buffer.from(joined, 'hex');
+                   } else {
+                       // Array of numbers
+                       return Buffer.from(val);
+                   }
+               }
+               if (typeof val === 'number') {
+                   return Buffer.from([val]);
+               }
+               if (typeof val === 'string') {
+                   const hexStr = val.replace(/[^0-9A-Fa-f]/g, '');
+                   const buf = Buffer.from(hexStr, 'hex');
+                   return isLittleEndian && buf.length > 1 ? Buffer.from([...buf].reverse()) : buf;
+               }
+               return Buffer.alloc(0);
            };
 
-           if(dumpData.body.length !== 1024) {
-               throw new Error(`Dump body size mismatch. Expected 1024, got ${dumpData.body.length}`);
+           // Fallback for custom JSON structures that don't perfectly match PM3
+           dumpData = {
+               uid: toBuffer(res.uid),
+               atqa: toBuffer(res.atqa, true), // ATQA often needs little-endian reversal if it's a 2-byte hex string '0004' -> '0400'
+               sak: toBuffer(res.sak),
+               ats: toBuffer(res.ats),
+               body: toBuffer(res.data)
+           };
+
+           if (!dumpData.body || dumpData.body.length !== 1024) {
+               throw new Error(`Dump body size mismatch. Expected 1024, got ${dumpData.body ? dumpData.body.length : 0}`);
            }
         }
 
@@ -434,12 +459,17 @@ window.bleEngine = {
         });
 
         // Write the entire 64 blocks (1024 bytes) memory dump at once
+        // This will automatically inject the Keys (e.g. FFFFFFFFFFFF) from the sector trailers
         await this.ultra.cmdMf1EmuWriteBlock(0, dumpData.body);
       }
 
       // Final save and set tag mode
       this.updateUI(98, "Salvataggio impostazioni hardware...", 'working');
       await this.ultra.cmdSlotSaveSettings();
+
+      // Force the device to completely reload the slot configs into its active memory (including keys)
+      await this.ultra.cmdChangeDeviceMode(window.ChameleonUltraJS.DeviceMode.READER);
+      await new Promise(r => setTimeout(r, 200));
       await this.ultra.cmdChangeDeviceMode(window.ChameleonUltraJS.DeviceMode.TAG);
 
       await this.ultra.disconnect();

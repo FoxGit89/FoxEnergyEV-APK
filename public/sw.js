@@ -1,4 +1,4 @@
-const CACHE_NAME = 'calisync-v8';
+const CACHE_NAME = 'calisync-v10';
 const ASSETS = [
   './',
   './index.html?v=4',
