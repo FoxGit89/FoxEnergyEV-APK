@@ -1,4 +1,4 @@
-const CACHE_NAME = 'calisync-v6';
+const CACHE_NAME = 'calisync-v7';
 const ASSETS = [
   './',
   './index.html?v=4',
@@ -30,17 +30,26 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-  // Pass through API requests directly to network, no cache
+  // Always hit network for API
   if (event.request.url.includes('app_api.php')) {
     return;
   }
-
+  
+  // Network-first strategy for static assets to avoid aggressive caching issues
   event.respondWith(
-    caches.match(event.request)
-      .then(response => response || fetch(event.request))
+    fetch(event.request)
+      .then(networkResponse => {
+        // Cache the fresh response for later offline use
+        return caches.open(CACHE_NAME).then(cache => {
+          cache.put(event.request, networkResponse.clone());
+          return networkResponse;
+        });
+      })
       .catch(() => {
-        // Fallback for offline if needed
-        return new Response('Offline');
+        // If network fails (offline), fallback to cache
+        return caches.match(event.request).then(cachedResponse => {
+           return cachedResponse || new Response('Offline');
+        });
       })
   );
 });

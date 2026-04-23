@@ -18,7 +18,7 @@ const app = {
     } else {
       this.showScreen('login-screen');
     }
-
+    
     // Close bottom sheet if clicked outside
     document.getElementById('slot-picker').addEventListener('click', (e) => {
       if (e.target.id === 'slot-picker') this.hideSlotPicker();
@@ -42,30 +42,30 @@ const app = {
     // Append parameters to URL
     const queryString = Object.keys(params).map(k => `${encodeURIComponent(k)}=${encodeURIComponent(params[k])}`).join('&');
     const fullUrl = `${url}?${queryString}`;
-
+    
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
-
-      const res = await fetch(fullUrl, {
+      
+      const res = await fetch(fullUrl, { 
         method: 'GET',
         headers: { 'Accept': 'application/json' },
-        signal: controller.signal
+        signal: controller.signal 
       });
       clearTimeout(timeoutId);
-
+      
       const text = await res.text(); // Leggiamo come testo prima per debug
       console.log(`[API RESPONSE - ${params.action}] Status: ${res.status}\nRaw Text:`, text);
-
+      
       if (!res.ok) {
          throw new Error(`Server returned ${res.status}: ${text.substring(0, 80)}`);
       }
-
+      
       try {
         if (text.trim() === '') {
              throw new Error('Risposta vuota dal server.');
         }
-
+        
         // Prima cerchiamo di parsare l'intera stringa in modo standard
         try {
             return JSON.parse(text);
@@ -73,7 +73,7 @@ const app = {
             // Se fallisce, cerchiamo il primo '{' o '[' per pulire l'output da eventuali warning PHP
             const firstBrace = text.indexOf('{');
             const firstBracket = text.indexOf('[');
-
+            
             let startIndex = -1;
             if (firstBrace !== -1 && firstBracket !== -1) {
                 startIndex = Math.min(firstBrace, firstBracket);
@@ -82,12 +82,12 @@ const app = {
             } else if (firstBracket !== -1) {
                 startIndex = firstBracket;
             }
-
+            
             if (startIndex !== -1) {
                 // Troviamo l'ultima parentesi corrispondente
                 const isArray = text[startIndex] === '[';
                 const lastIndex = isArray ? text.lastIndexOf(']') : text.lastIndexOf('}');
-
+                
                 if (lastIndex !== -1 && startIndex < lastIndex) {
                     const cleanJsonStr = text.substring(startIndex, lastIndex + 1);
                     return JSON.parse(cleanJsonStr);
@@ -164,15 +164,15 @@ const app = {
     localStorage.clear();
     this.user = { telegramId: null, firstName: null };
     this.mapping = { 1: null, 2: null, 3: null, 4: null, 5: null, 6: null, 7: null, 8: null };
-
+    
     // Reset auth gate styling if needed
     document.querySelector('.spinner').classList.remove('hidden');
     document.getElementById('auth-denied-content').classList.add('hidden');
     document.getElementById('auth-gate').classList.remove('denied');
-
+    
     document.getElementById('login-username').value = '';
     document.getElementById('login-card').value = '';
-
+    
     this.showScreen('login-screen');
   },
 
@@ -180,13 +180,13 @@ const app = {
   async loadDashboard() {
     this.showScreen('auth-gate'); // Show loading
     document.getElementById('dash-header-title').textContent = `CALISYNC • ${this.user.firstName}`;
-
+    
     try {
-      const [dashData, cardsData] = await Promise.all([
-        this.apiCall({ action: 'get_dashboard', user_id: this.user.telegramId }),
-        this.apiCall({ action: 'get_slots', user_id: this.user.telegramId })
-      ]);
-
+      // Dobbiamo fare le chiamate in sequenza perché il server built-in di PHP
+      // è single-threaded e non gestisce bene le richieste simultanee (Promise.all)
+      const dashData = await this.apiCall({ action: 'get_dashboard', user_id: this.user.telegramId });
+      const cardsData = await this.apiCall({ action: 'get_slots', user_id: this.user.telegramId });
+      
       if (dashData.error) {
         throw new Error("DASHBOARD: " + dashData.error);
       }
@@ -196,7 +196,7 @@ const app = {
 
       this.dashboard = dashData;
       this.cards = Array.isArray(cardsData) ? cardsData : [];
-
+      
       this.renderDashboard();
       this.renderSlots();
       this.showScreen('dashboard-screen');
@@ -215,12 +215,12 @@ const app = {
     document.getElementById('dash-balance-val').textContent = bal.toFixed(2);
     document.getElementById('dash-karma-val').textContent = this.dashboard.karma || "0";
     document.getElementById('dash-tariff-val').textContent = this.dashboard.loyalty_level || "Standard";
-
+    
     const dashCard = document.getElementById('dash-card');
     dashCard.className = 'dashboard-card' + (isPremium ? ' premium' : '') + (isLow ? ' low-balance' : '');
-
+    
     document.getElementById('dash-premium-badge').textContent = isPremium ? "FOX PREMIUM CLUB" : "UTENTE STANDARD";
-
+    
     const warnEl = document.getElementById('dash-warning');
     if (isLow) warnEl.classList.remove('hidden');
     else warnEl.classList.add('hidden');
@@ -228,7 +228,7 @@ const app = {
     // Populate Stats Screen data
     const monthNames = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
     document.getElementById('stats-month').textContent = monthNames[new Date().getMonth()];
-
+    
     if (this.dashboard.monthly_stats) {
       document.getElementById('stat-energy').textContent = `${this.dashboard.monthly_stats.energy_kwh || '0.00'} kWh`;
       document.getElementById('stat-spent').textContent = `€ ${this.dashboard.monthly_stats.spent_eur || '0.00'}`;
@@ -245,7 +245,7 @@ const app = {
     for (let i = 1; i <= 8; i++) {
       const card = this.mapping[i];
       if (card) canSync = true;
-
+      
       const div = document.createElement('div');
       div.className = `slot-card ${card ? 'active' : ''}`;
       div.onclick = () => this.openSlotPicker(i);
@@ -329,12 +329,12 @@ const app = {
 // ==========================================
 window.bleEngine = {
   ultra: null,
-
+  
   updateUI(progress, text, state = 'working') {
     document.getElementById('sync-progress-fill').style.width = `${progress}%`;
     document.getElementById('sync-progress-text').innerText = `${Math.round(progress)}% Completato`;
     document.getElementById('sync-status-text').innerText = text;
-
+    
     const icon = document.getElementById('sync-icon');
     icon.className = `sync-status-icon ${state}`;
     if (state === 'working') icon.innerText = '📶';
@@ -403,12 +403,12 @@ window.bleEngine = {
 
     try {
       const { ChameleonUltra, Buffer, TagType, FreqType } = window.ChameleonUltraJS;
-
+      
       if (!this.ultra) {
         this.ultra = new ChameleonUltra();
         this.ultra.use(new window.ChameleonUltraJS.WebbleAdapter());
       }
-
+      
       await this.ultra.disconnect().catch(() => {}); // Ensure clean state
       await this.ultra.connect();
 
@@ -434,13 +434,13 @@ window.bleEngine = {
       for (const item of slotsToWrite) {
         const { slotIdx, card } = item;
         done++;
-
+        
         this.updateUI((done / total) * 100 * 0.9, `Download dati per ${card.slot_label}...`, 'working');
-
+        
         // Fetch JSON
         const res = await app.apiCall({ action: 'get_json_content', user_id: telegramId, file_id: card.json_file_id });
         const cardData = this.parseCardData(res);
-
+        
         if (!cardData.uid || cardData.uid.length === 0) {
            throw new Error(`Dati non validi (UID mancante) per lo slot ${slotIdx + 1}`);
         }

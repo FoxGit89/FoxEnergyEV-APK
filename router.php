@@ -16,7 +16,7 @@ $rootPath = realpath(__DIR__ . $path);
 if ($rootPath && is_file($rootPath) && dirname($rootPath) === __DIR__) {
     // Only allow specific root PHP files to be executed directly
     if (pathinfo($rootPath, PATHINFO_EXTENSION) === 'php') {
-        return false;
+        return false; 
     }
 }
 
@@ -45,13 +45,13 @@ if ($publicPath && is_file($publicPath) && strpos($publicPath, $publicDir) === 0
         'xml'  => 'application/xml',
         'webmanifest' => 'application/manifest+json'
     ];
-
+    
     if (isset($mimeTypes[$ext])) {
         header('Content-Type: ' . $mimeTypes[$ext]);
     } else {
         header('Content-Type: application/octet-stream');
     }
-
+    
     readfile($publicPath);
     return true;
 }
