@@ -573,11 +573,18 @@ window.bleEngine = {
       const WebbleAdapter = window.ChameleonUltraJS.WebbleAdapter;
       const DeviceMode    = window.ChameleonUltraJS.DeviceMode;
 
-      // Crea sempre istanza fresca — NON chiamare disconnect sulla vecchia:
-      // disconnect() su un'istanza precedentemente fallita può bloccare il Web Bluetooth
-      // e impedire la nuova connessione. Semplicemente ignoriamo la vecchia istanza.
+      // --- DIAGNOSTICA TEMPORANEA ---
+      console.log('[BLE DIAG] window.ChameleonUltraJS keys:', Object.keys(window.ChameleonUltraJS || {}));
+      console.log('[BLE DIAG] WebbleAdapter type:', typeof WebbleAdapter);
+      console.log('[BLE DIAG] WebbleAdapter value:', WebbleAdapter);
+      console.log('[BLE DIAG] WebbleAdapter.default:', typeof WebbleAdapter?.default);
+      // Prova a trovare il costruttore reale
+      const WBA = typeof WebbleAdapter === 'function' ? WebbleAdapter : WebbleAdapter?.default;
+      console.log('[BLE DIAG] WBA (costruttore reale):', typeof WBA, WBA);
+      // --- FINE DIAGNOSTICA ---
+
       this.ultra = new ChameleonUltra();
-      this.ultra.use(new WebbleAdapter());
+      this.ultra.use(new WBA());
       await this.ultra.connect();
 
       const toWrite=[];
