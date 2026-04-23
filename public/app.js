@@ -566,8 +566,12 @@ window.bleEngine = {
   async startSync(mapping, telegramId) {
     this.updateUI(0,'Connessione al Chameleon Ultra...\nSeleziona il dispositivo nel popup Bluetooth.','working');
     try {
-      // Estrai tutto incluso WebbleAdapter da window.ChameleonUltraJS
-      const { ChameleonUltra, Buffer, TagType, FreqType, DeviceMode, WebbleAdapter } = window.ChameleonUltraJS;
+      // WebbleAdapter.global.js NON aggiunge WebbleAdapter dentro window.ChameleonUltraJS
+      // come proprietà enumerabile — il destructuring restituirebbe undefined → crash.
+      // Accesso diretto come nella versione originale funzionante.
+      const { ChameleonUltra, Buffer, TagType, FreqType } = window.ChameleonUltraJS;
+      const WebbleAdapter = window.ChameleonUltraJS.WebbleAdapter;
+      const DeviceMode    = window.ChameleonUltraJS.DeviceMode;
 
       // Sempre istanza fresca — non riutilizzare mai
       if (this.ultra) { try{await this.ultra.disconnect();}catch(e){} this.ultra=null; }
@@ -651,7 +655,9 @@ window.bleEngine = {
   // Solo se disconnesso in background ricrea la connessione
   // ──────────────────────────────────────────────────────────
   async wipeAllSlots(updateCallback) {
-    const { ChameleonUltra, TagType, FreqType, DeviceMode, WebbleAdapter } = window.ChameleonUltraJS;
+    const { ChameleonUltra, TagType, FreqType } = window.ChameleonUltraJS;
+    const WebbleAdapter = window.ChameleonUltraJS.WebbleAdapter;
+    const DeviceMode    = window.ChameleonUltraJS.DeviceMode;
 
     updateCallback('🗑️','CANCELLAZIONE IN CORSO','Verifica connessione dispositivo...');
 
