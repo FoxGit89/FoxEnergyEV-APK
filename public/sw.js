@@ -1,10 +1,10 @@
-const CACHE_NAME = 'calisync-v10';
+const CACHE_NAME = 'calisync-v11';
 const ASSETS = [
   './',
-  './index.html?v=4',
-  './style.css?v=4',
-  './app.js?v=4',
-  './manifest.json?v=4',
+  './index.html?v=11',
+  './style.css?v=11',
+  './app.js?v=11',
+  './manifest.json?v=11',
   'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/index.global.js',
   'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/Crypto1.global.js',
   'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/plugin/WebbleAdapter.global.js'
@@ -30,25 +30,23 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-  // Always hit network for API
+  // Sempre rete per le API
   if (event.request.url.includes('app_api.php')) {
     return;
   }
 
-  // Network-first strategy for static assets to avoid aggressive caching issues
+  // Network-first per gli asset statici
   event.respondWith(
     fetch(event.request)
       .then(networkResponse => {
-        // Cache the fresh response for later offline use
         return caches.open(CACHE_NAME).then(cache => {
           cache.put(event.request, networkResponse.clone());
           return networkResponse;
         });
       })
       .catch(() => {
-        // If network fails (offline), fallback to cache
         return caches.match(event.request).then(cachedResponse => {
-           return cachedResponse || new Response('Offline');
+          return cachedResponse || new Response('Offline');
         });
       })
   );

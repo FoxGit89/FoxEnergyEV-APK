@@ -5,10 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>CaliSync by Fox Energy EV</title>
   <meta name="theme-color" content="#FF9800">
-  <link rel="manifest" href="manifest.json?v=10">
-  <link rel="stylesheet" href="style.css?v=10">
+  <link rel="manifest" href="manifest.json?v=11">
+  <link rel="stylesheet" href="style.css?v=11">
 
-  <!-- Chamelon Ultra JS dependencies via CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/index.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/Crypto1.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/plugin/WebbleAdapter.global.js"></script>
@@ -55,10 +54,13 @@
     </div>
   </div>
 
-  <!-- Screen 2: MultiSlot Config (Dashboard) -->
+  <!-- Screen 2: Dashboard -->
   <div id="dashboard-screen" class="screen hidden">
     <div class="app-header">
       <span id="dash-header-title">CALISYNC</span>
+      <button class="header-notif-btn" onclick="app.showNotifications()">
+        🔔<span id="notif-header-dot" class="header-badge hidden"></span>
+      </button>
       <button class="header-action" onclick="app.logout()">🚪</button>
     </div>
 
@@ -154,9 +156,7 @@
     </div>
 
     <div class="container" style="display: flex; flex-direction: column; justify-content: center; height: calc(100vh - 60px);">
-      <div id="sync-icon" class="sync-status-icon working">
-        📶
-      </div>
+      <div id="sync-icon" class="sync-status-icon working">📶</div>
 
       <div id="sync-progress-container" class="progress-container">
         <div class="progress-bar-bg">
@@ -175,25 +175,51 @@
     </div>
   </div>
 
-  <!-- Modals and Overlays -->
+  <!-- Screen 5: Notifiche -->
+  <div id="notifications-screen" class="screen hidden">
+    <div class="app-header">
+      <button class="header-back" onclick="app.showScreen('dashboard-screen')">◀</button>
+      Notifiche
+      <span id="notif-badge-header" class="header-badge hidden"></span>
+    </div>
+    <div class="container" style="padding-bottom: 40px;">
+      <div id="notif-list">
+        <div class="notif-empty">
+          <div style="font-size: 48px; margin-bottom: 16px;">🔔</div>
+          <div style="color: var(--text-muted); font-size: 15px;">Nessuna notifica</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- Screen 6: Storico Ricariche -->
+  <div id="history-screen" class="screen hidden">
+    <div class="app-header">
+      <button class="header-back" onclick="app.showScreen('dashboard-screen')">◀</button>
+      Storico Ricariche
+    </div>
+    <div class="container" style="padding-bottom: 40px;">
+      <div id="history-list">
+        <div class="notif-empty">
+          <div style="font-size: 48px; margin-bottom: 16px;">⚡</div>
+          <div style="color: var(--text-muted); font-size: 15px;">Nessuna sessione trovata</div>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- Slot Picker Bottom Sheet -->
   <div id="slot-picker" class="modal-overlay hidden">
     <div class="bottom-sheet">
-      <div class="sheet-header">
-        💾 Assegna Dati allo Slot
-      </div>
-      <div id="slot-picker-list" class="sheet-content">
-        <!-- Rendered via JS -->
-      </div>
+      <div class="sheet-header">💾 Assegna Dati allo Slot</div>
+      <div id="slot-picker-list" class="sheet-content"></div>
     </div>
   </div>
 
   <!-- First Sync Guide Dialog -->
   <div id="sync-dialog" class="dialog-overlay hidden">
     <div class="dialog">
-      <div class="dialog-title">
-        💾 Prima Sincronizzazione
-      </div>
+      <div class="dialog-title">💾 Prima Sincronizzazione</div>
       <div class="dialog-content">
         <p>Il sistema resetterà e configurerà <strong>automaticamente</strong> tutti gli slot del tuo Chameleon Ultra prima della scrittura.</p>
         <br>
@@ -209,6 +235,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=10"></script>
+  <script src="app.js?v=11"></script>
 </body>
 </html>
