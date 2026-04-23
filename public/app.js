@@ -573,8 +573,9 @@ window.bleEngine = {
       const WebbleAdapter = window.ChameleonUltraJS.WebbleAdapter;
       const DeviceMode    = window.ChameleonUltraJS.DeviceMode;
 
-      // Sempre istanza fresca — non riutilizzare mai
-      if (this.ultra) { try{await this.ultra.disconnect();}catch(e){} this.ultra=null; }
+      // Crea sempre istanza fresca — NON chiamare disconnect sulla vecchia:
+      // disconnect() su un'istanza precedentemente fallita può bloccare il Web Bluetooth
+      // e impedire la nuova connessione. Semplicemente ignoriamo la vecchia istanza.
       this.ultra = new ChameleonUltra();
       this.ultra.use(new WebbleAdapter());
       await this.ultra.connect();
@@ -667,8 +668,7 @@ window.bleEngine = {
       : !!this.ultra; // fallback se isConnected non esiste nella versione
 
     if (!isAlive) {
-      // BLE si è disconnesso in background: ricrea (richiede secondo popup)
-      if (this.ultra) { try{await this.ultra.disconnect();}catch(e){} this.ultra=null; }
+      // BLE disconnesso: crea nuova istanza senza toccare la vecchia
       updateCallback('🗑️','CANCELLAZIONE IN CORSO','Riconnessione al dispositivo...\n(Seleziona il Chameleon nel popup)');
       this.ultra = new ChameleonUltra();
       this.ultra.use(new WebbleAdapter());
