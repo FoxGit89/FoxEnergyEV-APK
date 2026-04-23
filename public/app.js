@@ -566,25 +566,22 @@ window.bleEngine = {
   async startSync(mapping, telegramId) {
     this.updateUI(0,'Connessione al Chameleon Ultra...\nSeleziona il dispositivo nel popup Bluetooth.','working');
     try {
-      // WebbleAdapter.global.js NON aggiunge WebbleAdapter dentro window.ChameleonUltraJS
-      // come proprietà enumerabile — il destructuring restituirebbe undefined → crash.
-      // Accesso diretto come nella versione originale funzionante.
-      const { ChameleonUltra, Buffer, TagType, FreqType } = window.ChameleonUltraJS;
-      const WebbleAdapter = window.ChameleonUltraJS.WebbleAdapter;
-      const DeviceMode    = window.ChameleonUltraJS.DeviceMode;
+      // Verifica disponibilità Web Bluetooth
+      if (!navigator.bluetooth) {
+        throw new Error('Web Bluetooth non disponibile.\nUsa Chrome su Android o Chrome Desktop con Bluetooth abilitato.');
+      }
 
-      // --- DIAGNOSTICA TEMPORANEA ---
-      console.log('[BLE DIAG] window.ChameleonUltraJS keys:', Object.keys(window.ChameleonUltraJS || {}));
-      console.log('[BLE DIAG] WebbleAdapter type:', typeof WebbleAdapter);
-      console.log('[BLE DIAG] WebbleAdapter value:', WebbleAdapter);
-      console.log('[BLE DIAG] WebbleAdapter.default:', typeof WebbleAdapter?.default);
-      // Prova a trovare il costruttore reale
-      const WBA = typeof WebbleAdapter === 'function' ? WebbleAdapter : WebbleAdapter?.default;
-      console.log('[BLE DIAG] WBA (costruttore reale):', typeof WBA, WBA);
-      // --- FINE DIAGNOSTICA ---
+      // Import ESM dinamico unificato — ChameleonUltra e WebbleAdapter
+      // dallo stesso bundle: risolve il bug "this.port is undefined"
+      // causato da bundle separati (index.global.js ≠ WebbleAdapter.global.js)
+      const ESM_BASE = 'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0.4.6';
+      const { ChameleonUltra, Buffer, TagType, FreqType, DeviceMode } =
+        await import(ESM_BASE + '/+esm');
+      const { default: WebbleAdapter } =
+        await import(ESM_BASE + '/plugin/WebbleAdapter/+esm');
 
       this.ultra = new ChameleonUltra();
-      this.ultra.use(new WBA());
+      this.ultra.use(new WebbleAdapter());
       await this.ultra.connect();
 
       const toWrite=[];
@@ -663,22 +660,24 @@ window.bleEngine = {
   // Solo se disconnesso in background ricrea la connessione
   // ──────────────────────────────────────────────────────────
   async wipeAllSlots(updateCallback) {
-    const { ChameleonUltra, TagType, FreqType } = window.ChameleonUltraJS;
-    const WebbleAdapter = window.ChameleonUltraJS.WebbleAdapter;
-    const DeviceMode    = window.ChameleonUltraJS.DeviceMode;
-
     updateCallback('🗑️','CANCELLAZIONE IN CORSO','Verifica connessione dispositivo...');
 
     // Controlla se l'istanza è ancora utilizzabile
     const isAlive = this.ultra && typeof this.ultra.isConnected === 'function'
       ? this.ultra.isConnected()
-      : !!this.ultra; // fallback se isConnected non esiste nella versione
+      : !!this.ultra;
+
+    // Importa dal bundle ESM unificato (stesso fix di startSync)
+    const ESM_BASE = 'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0.4.6';
+    const { ChameleonUltra, TagType, FreqType, DeviceMode } =
+      await import(ESM_BASE + '/+esm');
+    const { default: WbleAdapter } =
+      await import(ESM_BASE + '/plugin/WebbleAdapter/+esm');
 
     if (!isAlive) {
-      // BLE disconnesso: crea nuova istanza senza toccare la vecchia
       updateCallback('🗑️','CANCELLAZIONE IN CORSO','Riconnessione al dispositivo...\n(Seleziona il Chameleon nel popup)');
       this.ultra = new ChameleonUltra();
-      this.ultra.use(new WebbleAdapter());
+      this.ultra.use(new WbleAdapter());
       await this.ultra.connect();
     } else {
       // BLE ancora connesso: riusa direttamente — nessun popup

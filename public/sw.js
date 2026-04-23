@@ -1,10 +1,10 @@
-const CACHE_NAME = 'calisync-v16';
+const CACHE_NAME = 'calisync-v17';
 const ASSETS = [
   './',
-  './index.html?v=16',
-  './style.css?v=16',
-  './app.js?v=16',
-  './manifest.json?v=16',
+  './index.html?v=17',
+  './style.css?v=17',
+  './app.js?v=17',
+  './manifest.json?v=17',
   'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/index.global.js',
   'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/Crypto1.global.js',
   'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/plugin/WebbleAdapter.global.js'
