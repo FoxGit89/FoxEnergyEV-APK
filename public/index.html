@@ -5,9 +5,9 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>CaliSync by Fox Energy EV</title>
   <meta name="theme-color" content="#FF9800">
-  <link rel="manifest" href="manifest.json?v=7">
-  <link rel="stylesheet" href="style.css?v=7">
-  
+  <link rel="manifest" href="manifest.json?v=8">
+  <link rel="stylesheet" href="style.css?v=8">
+
   <!-- Chamelon Ultra JS dependencies via CDN -->
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/index.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/Crypto1.global.js"></script>
@@ -42,7 +42,7 @@
         <span class="icon">👤</span>
         <input type="text" id="login-username" placeholder="Username Telegram o ID">
       </div>
-      
+
       <div class="input-group">
         <span class="icon">💳</span>
         <input type="password" id="login-card" placeholder="Numero Tessera Fox Energy">
@@ -72,7 +72,7 @@
           </div>
           <div style="font-size: 32px;">💼</div>
         </div>
-        
+
         <div class="dash-balance-row">
           <div>
             <div class="dash-balance">€ <span id="dash-balance-val">0.00</span></div>
@@ -80,9 +80,9 @@
           </div>
           <div class="dash-details-btn">Riepilogo ▶</div>
         </div>
-        
+
         <div class="dash-divider"></div>
-        
+
         <div class="dash-bottom">
           <div class="dash-bottom-item">🛡️ Karma: <span id="dash-karma-val">0</span></div>
           <div class="dash-bottom-item" style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
@@ -114,10 +114,10 @@
       <button class="header-back" onclick="app.showScreen('dashboard-screen')">◀</button>
       Riepilogo Mensile
     </div>
-    
+
     <div class="container">
       <div class="stats-header">Statistiche di <span id="stats-month"></span></div>
-      
+
       <div class="stat-card" style="border-color: rgba(68, 138, 255, 0.3);">
         <div class="stat-icon-wrap" style="background-color: rgba(68, 138, 255, 0.15); color: #448AFF;">⚡</div>
         <div>
@@ -152,23 +152,23 @@
     <div class="app-header">
       Gestione Terminale
     </div>
-    
+
     <div class="container" style="display: flex; flex-direction: column; justify-content: center; height: calc(100vh - 60px);">
       <div id="sync-icon" class="sync-status-icon working">
         📶
       </div>
-      
+
       <div id="sync-progress-container" class="progress-container">
         <div class="progress-bar-bg">
           <div id="sync-progress-fill" class="progress-bar-fill"></div>
         </div>
         <div id="sync-progress-text" class="progress-text">0% Completato</div>
       </div>
-      
+
       <div id="sync-status-text" class="status-text">
         Connessione al Chameleon Ultra...
       </div>
-      
+
       <div style="margin-top: 60px; padding: 0 20px;">
         <button id="sync-back-btn" class="btn-secondary hidden" onclick="app.showScreen('dashboard-screen')">TORNA ALLA DASHBOARD</button>
       </div>
@@ -209,6 +209,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=7"></script>
+  <script src="app.js?v=8"></script>
 </body>
 </html>

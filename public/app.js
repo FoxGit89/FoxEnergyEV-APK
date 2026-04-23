@@ -18,7 +18,7 @@ const app = {
     } else {
       this.showScreen('login-screen');
     }
-    
+
     // Close bottom sheet if clicked outside
     document.getElementById('slot-picker').addEventListener('click', (e) => {
       if (e.target.id === 'slot-picker') this.hideSlotPicker();
@@ -42,30 +42,30 @@ const app = {
     // Append parameters to URL
     const queryString = Object.keys(params).map(k => `${encodeURIComponent(k)}=${encodeURIComponent(params[k])}`).join('&');
     const fullUrl = `${url}?${queryString}`;
-    
+
     try {
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
-      
-      const res = await fetch(fullUrl, { 
+
+      const res = await fetch(fullUrl, {
         method: 'GET',
         headers: { 'Accept': 'application/json' },
-        signal: controller.signal 
+        signal: controller.signal
       });
       clearTimeout(timeoutId);
-      
+
       const text = await res.text(); // Leggiamo come testo prima per debug
       console.log(`[API RESPONSE - ${params.action}] Status: ${res.status}\nRaw Text:`, text);
-      
+
       if (!res.ok) {
          throw new Error(`Server returned ${res.status}: ${text.substring(0, 80)}`);
       }
-      
+
       try {
         if (text.trim() === '') {
              throw new Error('Risposta vuota dal server.');
         }
-        
+
         // Prima cerchiamo di parsare l'intera stringa in modo standard
         try {
             return JSON.parse(text);
@@ -73,7 +73,7 @@ const app = {
             // Se fallisce, cerchiamo il primo '{' o '[' per pulire l'output da eventuali warning PHP
             const firstBrace = text.indexOf('{');
             const firstBracket = text.indexOf('[');
-            
+
             let startIndex = -1;
             if (firstBrace !== -1 && firstBracket !== -1) {
                 startIndex = Math.min(firstBrace, firstBracket);
@@ -82,12 +82,12 @@ const app = {
             } else if (firstBracket !== -1) {
                 startIndex = firstBracket;
             }
-            
+
             if (startIndex !== -1) {
                 // Troviamo l'ultima parentesi corrispondente
                 const isArray = text[startIndex] === '[';
                 const lastIndex = isArray ? text.lastIndexOf(']') : text.lastIndexOf('}');
-                
+
                 if (lastIndex !== -1 && startIndex < lastIndex) {
                     const cleanJsonStr = text.substring(startIndex, lastIndex + 1);
                     return JSON.parse(cleanJsonStr);
@@ -164,15 +164,15 @@ const app = {
     localStorage.clear();
     this.user = { telegramId: null, firstName: null };
     this.mapping = { 1: null, 2: null, 3: null, 4: null, 5: null, 6: null, 7: null, 8: null };
-    
+
     // Reset auth gate styling if needed
     document.querySelector('.spinner').classList.remove('hidden');
     document.getElementById('auth-denied-content').classList.add('hidden');
     document.getElementById('auth-gate').classList.remove('denied');
-    
+
     document.getElementById('login-username').value = '';
     document.getElementById('login-card').value = '';
-    
+
     this.showScreen('login-screen');
   },
 
@@ -180,13 +180,13 @@ const app = {
   async loadDashboard() {
     this.showScreen('auth-gate'); // Show loading
     document.getElementById('dash-header-title').textContent = `CALISYNC • ${this.user.firstName}`;
-    
+
     try {
       // Dobbiamo fare le chiamate in sequenza perché il server built-in di PHP
       // è single-threaded e non gestisce bene le richieste simultanee (Promise.all)
       const dashData = await this.apiCall({ action: 'get_dashboard', user_id: this.user.telegramId });
       const cardsData = await this.apiCall({ action: 'get_slots', user_id: this.user.telegramId });
-      
+
       if (dashData.error) {
         throw new Error("DASHBOARD: " + dashData.error);
       }
@@ -196,7 +196,7 @@ const app = {
 
       this.dashboard = dashData;
       this.cards = Array.isArray(cardsData) ? cardsData : [];
-      
+
       this.renderDashboard();
       this.renderSlots();
       this.showScreen('dashboard-screen');
@@ -215,12 +215,12 @@ const app = {
     document.getElementById('dash-balance-val').textContent = bal.toFixed(2);
     document.getElementById('dash-karma-val').textContent = this.dashboard.karma || "0";
     document.getElementById('dash-tariff-val').textContent = this.dashboard.loyalty_level || "Standard";
-    
+
     const dashCard = document.getElementById('dash-card');
     dashCard.className = 'dashboard-card' + (isPremium ? ' premium' : '') + (isLow ? ' low-balance' : '');
-    
+
     document.getElementById('dash-premium-badge').textContent = isPremium ? "FOX PREMIUM CLUB" : "UTENTE STANDARD";
-    
+
     const warnEl = document.getElementById('dash-warning');
     if (isLow) warnEl.classList.remove('hidden');
     else warnEl.classList.add('hidden');
@@ -228,7 +228,7 @@ const app = {
     // Populate Stats Screen data
     const monthNames = ["Gennaio", "Febbraio", "Marzo", "Aprile", "Maggio", "Giugno", "Luglio", "Agosto", "Settembre", "Ottobre", "Novembre", "Dicembre"];
     document.getElementById('stats-month').textContent = monthNames[new Date().getMonth()];
-    
+
     if (this.dashboard.monthly_stats) {
       document.getElementById('stat-energy').textContent = `${this.dashboard.monthly_stats.energy_kwh || '0.00'} kWh`;
       document.getElementById('stat-spent').textContent = `€ ${this.dashboard.monthly_stats.spent_eur || '0.00'}`;
@@ -245,7 +245,7 @@ const app = {
     for (let i = 1; i <= 8; i++) {
       const card = this.mapping[i];
       if (card) canSync = true;
-      
+
       const div = document.createElement('div');
       div.className = `slot-card ${card ? 'active' : ''}`;
       div.onclick = () => this.openSlotPicker(i);
@@ -329,12 +329,12 @@ const app = {
 // ==========================================
 window.bleEngine = {
   ultra: null,
-  
+
   updateUI(progress, text, state = 'working') {
     document.getElementById('sync-progress-fill').style.width = `${progress}%`;
     document.getElementById('sync-progress-text').innerText = `${Math.round(progress)}% Completato`;
     document.getElementById('sync-status-text').innerText = text;
-    
+
     const icon = document.getElementById('sync-icon');
     icon.className = `sync-status-icon ${state}`;
     if (state === 'working') icon.innerText = '📶';
@@ -348,67 +348,17 @@ window.bleEngine = {
     }
   },
 
-  parseCardData(json) {
-    const result = {
-      blocks: Array.from({ length: 64 }, () => new Array(16).fill(0)),
-      uid: [],
-      atqa: 0,
-      sak: 0,
-      ats: []
-    };
-
-    if (typeof json !== 'object') return result;
-
-    if (json.uid && typeof json.uid === 'string') {
-      const uidStr = json.uid.replace(/[^0-9A-Fa-f]/g, '');
-      for (let i = 0; i < uidStr.length && result.uid.length < 7; i += 2) {
-        result.uid.push(parseInt(uidStr.substring(i, i + 2), 16));
-      }
-    }
-
-    if (json.data && Array.isArray(json.data)) {
-      for (let i = 0; i < json.data.length && i < 64; i++) {
-        if (typeof json.data[i] === 'string') {
-          const blockStr = json.data[i].replace(/[^0-9A-Fa-f]/g, '');
-          for (let j = 0; j < 32 && j < blockStr.length; j += 2) {
-            result.blocks[i][j / 2] = parseInt(blockStr.substring(j, j + 2), 16);
-          }
-        }
-      }
-    }
-
-    if (json.atqa && Array.isArray(json.atqa) && json.atqa.length >= 2) {
-      result.atqa = (json.atqa[0] << 8) | json.atqa[1];
-    } else if (typeof json.atqa === 'string') {
-        const atqaStr = json.atqa.replace(/[^0-9A-Fa-f]/g, '');
-        if (atqaStr.length >= 4) {
-            result.atqa = parseInt(atqaStr, 16);
-        }
-    }
-
-    if (json.sak !== undefined) {
-      if (typeof json.sak === 'number') {
-        result.sak = json.sak;
-      } else if (typeof json.sak === 'string') {
-        const sakStr = json.sak.replace(/[^0-9A-Fa-f]/g, '');
-        if (sakStr) result.sak = parseInt(sakStr, 16);
-      }
-    }
-
-    return result;
-  },
-
   async startSync(mapping, telegramId) {
     this.updateUI(0, "Connessione al Chameleon Ultra in corso...\nSeleziona il dispositivo nel popup.", 'working');
 
     try {
       const { ChameleonUltra, Buffer, TagType, FreqType } = window.ChameleonUltraJS;
-      
+
       if (!this.ultra) {
         this.ultra = new ChameleonUltra();
         this.ultra.use(new window.ChameleonUltraJS.WebbleAdapter());
       }
-      
+
       await this.ultra.disconnect().catch(() => {}); // Ensure clean state
       await this.ultra.connect();
 
@@ -426,6 +376,8 @@ window.bleEngine = {
         await this.ultra.cmdSlotChangeTagType(i, TagType.MIFARE_1024);
         await this.ultra.cmdSlotResetTagType(i, TagType.MIFARE_1024);
         await this.ultra.cmdSlotSetEnable(i, FreqType.HF, false);
+        // Reset the nickname alias for safety
+        await this.ultra.cmdSlotDeleteFreqName(i, FreqType.HF).catch(() => {});
       }
       await this.ultra.cmdSlotSaveSettings();
 
@@ -434,46 +386,55 @@ window.bleEngine = {
       for (const item of slotsToWrite) {
         const { slotIdx, card } = item;
         done++;
-        
+
         this.updateUI((done / total) * 100 * 0.9, `Download dati per ${card.slot_label}...`, 'working');
-        
-        // Fetch JSON
+
+        // Fetch JSON from Telegram via backend
         const res = await app.apiCall({ action: 'get_json_content', user_id: telegramId, file_id: card.json_file_id });
-        const cardData = this.parseCardData(res);
-        
-        if (!cardData.uid || cardData.uid.length === 0) {
-           throw new Error(`Dati non validi (UID mancante) per lo slot ${slotIdx + 1}`);
-        }
 
         this.updateUI((done / total) * 100 * 0.9 + 5, `Scrittura Slot ${slotIdx + 1} (${card.slot_label})...`, 'working');
 
-        // Set active and enable
+        // Parse official PM3 JSON using library's native method to ensure 100% compliance
+        // The file format downloaded from Telegram is expected to be PM3 JSON
+        let dumpData;
+        try {
+           const parsedResp = ChameleonUltra.mf1DumpFromPm3Json(res);
+           dumpData = parsedResp;
+        } catch (err) {
+           console.warn(`Fallback al vecchio parser JSON per slot ${slotIdx + 1}`, err);
+           // Fallback for custom JSON structures that don't perfectly match PM3
+           dumpData = {
+               uid: Buffer.from(res.uid.replace(/\s+/g,''), 'hex'),
+               atqa: Buffer.from(Array.isArray(res.atqa) ? res.atqa.map(x=>x.toString(16).padStart(2,'0')).join('') : res.atqa.replace(/\s+/g,''), 'hex').reverse(),
+               sak: Buffer.from([res.sak]),
+               ats: res.ats ? Buffer.from(res.ats.replace(/\s+/g,''), 'hex') : Buffer.alloc(0),
+               body: Buffer.from(res.data ? res.data.join('').replace(/\s+/g,'') : '', 'hex')
+           };
+
+           if(dumpData.body.length !== 1024) {
+               throw new Error(`Dump body size mismatch. Expected 1024, got ${dumpData.body.length}`);
+           }
+        }
+
+        // Set active, set TagType and Enable
+        await this.ultra.cmdSlotSetActive(slotIdx);
         await this.ultra.cmdSlotChangeTagType(slotIdx, TagType.MIFARE_1024);
         await this.ultra.cmdSlotResetTagType(slotIdx, TagType.MIFARE_1024);
         await this.ultra.cmdSlotSetEnable(slotIdx, FreqType.HF, true);
-        await this.ultra.cmdSlotSetActive(slotIdx);
 
-        // Anti-collision
-        const uidBuf = Buffer.from(cardData.uid);
-        // Default values if not parsed correctly
-        let atqaStr = cardData.atqa.toString(16).padStart(4, '0');
-        // Webble adapter expects ATQA in little-endian sometimes, but let's send standard bytes
-        // The flutter code sent `atqa & 0xFF`, `(atqa >> 8) & 0xFF` which is Little Endian.
-        // Buffer.from('0400', 'hex') is what the JS docs show for standard 1K
-        const atqaBuf = Buffer.from([(cardData.atqa >> 8) & 0xFF, cardData.atqa & 0xFF]);
-        const sakBuf = Buffer.from([cardData.sak || 0x08]);
+        // Apply Alias (Visible name in GUI)
+        await this.ultra.cmdSlotSetFreqName(slotIdx, FreqType.HF, card.slot_label);
 
+        // Set Anti-collision Data natively extracted by the lib
         await this.ultra.cmdHf14aSetAntiCollData({
-          uid: uidBuf,
-          atqa: atqaBuf.length === 2 ? Buffer.from([...atqaBuf].reverse()) : Buffer.from('0400', 'hex'), // reverse to match standard LE '0400'
-          sak: sakBuf,
+          uid: dumpData.uid,
+          atqa: dumpData.atqa,
+          sak: dumpData.sak,
+          ats: dumpData.ats || Buffer.alloc(0)
         });
 
-        // Write blocks
-        for (let b = 0; b < 64; b++) {
-          const blockData = Buffer.from(cardData.blocks[b]);
-          await this.ultra.cmdMf1EmuWriteBlock(b, blockData);
-        }
+        // Write the entire 64 blocks (1024 bytes) memory dump at once
+        await this.ultra.cmdMf1EmuWriteBlock(0, dumpData.body);
       }
 
       // Final save and set tag mode

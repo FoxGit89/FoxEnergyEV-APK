@@ -1,4 +1,4 @@
-const CACHE_NAME = 'calisync-v7';
+const CACHE_NAME = 'calisync-v8';
 const ASSETS = [
   './',
   './index.html?v=4',
@@ -34,7 +34,7 @@ self.addEventListener('fetch', event => {
   if (event.request.url.includes('app_api.php')) {
     return;
   }
-  
+
   // Network-first strategy for static assets to avoid aggressive caching issues
   event.respondWith(
     fetch(event.request)
