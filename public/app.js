@@ -487,7 +487,7 @@ window.bleEngine = {
       } 
    
       this.ultra = new ChameleonUltra(); 
-      this.ultra.use(new window.ChameleonUltraJS.WebbleAdapter()); 
+      await this.ultra.use(new window.ChameleonUltraJS.WebbleAdapter()); 
       await this.ultra.connect(); 
    
       const slotsToWrite = []; 
