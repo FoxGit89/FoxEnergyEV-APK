@@ -846,3 +846,26 @@ input {
   0%   { background-position: 200% 0; }
   100% { background-position: -200% 0; }
 }
+
+/* ==========================================
+   SESSION SCREEN
+   ========================================== */
+#session-screen { background: linear-gradient(160deg, #0D0D0D 0%, #1a0a00 100%); }
+#wipe-screen    { background: #0D0D0D; }
+
+.session-ring-wrap { position:relative; width:160px; height:160px; margin-bottom:28px; }
+.session-ring      { width:160px; height:160px; transform:rotate(-90deg); }
+.session-ring-bg   { fill:none; stroke:rgba(255,152,0,0.15); stroke-width:8; }
+.session-ring-fill { fill:none; stroke:var(--primary-orange); stroke-width:8; stroke-linecap:round; transition:stroke-dashoffset 1s linear, stroke 0.5s; }
+.session-ring-fill.urgent { stroke:#FF5252; }
+.session-ring-inner { position:absolute; top:50%; left:50%; transform:translate(-50%,-50%); text-align:center; }
+.session-countdown-num { font-size:44px; font-weight:900; color:var(--primary-orange); line-height:1; transition:color 0.5s; }
+.session-countdown-num.urgent { color:#FF5252; }
+.session-countdown-label { font-size:12px; color:var(--text-muted); letter-spacing:1px; margin-top:4px; }
+.session-loaded-label { font-size:16px; font-weight:700; color:#4CAF50; margin-bottom:8px; }
+.session-slots-summary { font-size:13px; color:var(--text-muted); margin-bottom:20px; line-height:1.6; }
+.session-status-msg { font-size:15px; color:rgba(255,255,255,0.7); line-height:1.7; max-width:320px; margin-bottom:10px; }
+.session-warning-bar { background:rgba(255,82,82,0.15); border:1px solid rgba(255,82,82,0.4); border-radius:12px; padding:10px 20px; color:#FF5252; font-size:14px; font-weight:700; margin-top:10px; width:100%; text-align:center; }
+.btn-danger { width:100%; padding:16px; background-color:#B71C1C; color:white; border-radius:15px; font-size:16px; font-weight:bold; letter-spacing:1px; box-shadow:0 4px 6px rgba(183,28,28,0.4); transition:opacity 0.2s; border:none; cursor:pointer; }
+.btn-danger:active  { opacity:0.8; }
+.btn-danger:disabled { background-color:#2A2A2A; color:rgba(255,255,255,0.38); box-shadow:none; cursor:not-allowed; }

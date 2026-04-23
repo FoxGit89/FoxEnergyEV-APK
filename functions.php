@@ -2,13 +2,11 @@
 function db(): PDO {
     static $pdo = null;
     if ($pdo !== null) return $pdo;
-
     $host = getenv('MYSQLHOST')     ?: 'localhost';
     $user = getenv('MYSQLUSER')     ?: 'root';
     $pass = getenv('MYSQLPASSWORD') ?: '';
     $db   = getenv('MYSQLDATABASE') ?: 'railway';
     $port = getenv('MYSQLPORT')     ?: '3306';
-
     try {
         $pdo = new PDO("mysql:host=$host;port=$port;dbname=$db;charset=utf8mb4", $user, $pass);
         $pdo->setAttribute(PDO::ATTR_ERRMODE, PDO::ERRMODE_EXCEPTION);
@@ -18,64 +16,27 @@ function db(): PDO {
     }
 }
 
-/**
- * Calcola i totali del Mese Corrente leggendo dalle tabelle in produzione.
- */
 function getUserMonthlyStats($telegram_id) {
-    $stats = [
-        'energy_kwh'    => '0.00',
-        'spent_eur'     => '0.00',
-        'recharged_eur' => '0.00',
-        'debug_msg'     => 'Tutto OK'
-    ];
-
-    $pdo           = db();
-    $current_month = date('Y-m');
-    $errori        = [];
-
-    // Somma ricariche wallet
+    $stats = ['energy_kwh'=>'0.00','spent_eur'=>'0.00','recharged_eur'=>'0.00','debug_msg'=>'OK'];
+    $pdo   = db();
+    $month = date('Y-m');
+    $errs  = [];
     try {
-        $stmt1 = $pdo->prepare("
-            SELECT SUM(w.amount) as total
-            FROM wallet_recharges w
-            JOIN users u ON (w.user_id = u.id OR w.user_id = u.telegram_id)
-            WHERE u.telegram_id = ?
-            AND w.status = 'CONFIRMED'
-            AND DATE_FORMAT(w.created_at, '%Y-%m') = ?
-        ");
-        $stmt1->execute([$telegram_id, $current_month]);
-        $res1 = $stmt1->fetch(PDO::FETCH_ASSOC);
-        if ($res1 && $res1['total']) {
-            $stats['recharged_eur'] = number_format((float)$res1['total'], 2, '.', '');
-        }
-    } catch (Exception $e) {
-        $errori[] = "Errore Wallet: " . $e->getMessage();
-    }
-
-    // Somma consumi
+        $s = $pdo->prepare("SELECT SUM(w.amount) as total FROM wallet_recharges w JOIN users u ON (w.user_id=u.id OR w.user_id=u.telegram_id) WHERE u.telegram_id=? AND w.status='CONFIRMED' AND DATE_FORMAT(w.created_at,'%Y-%m')=?");
+        $s->execute([$telegram_id,$month]);
+        $r = $s->fetch(PDO::FETCH_ASSOC);
+        if ($r&&$r['total']) $stats['recharged_eur']=number_format((float)$r['total'],2,'.','' );
+    } catch(Exception $e) { $errs[]='Wallet: '.$e->getMessage(); }
     try {
-        $stmt2 = $pdo->prepare("
-            SELECT SUM(t.kwh) as tot_kwh, SUM(t.importo_eur) as tot_eur
-            FROM transactions t
-            JOIN users u ON (t.user_id = u.id OR t.user_id = u.telegram_id)
-            WHERE u.telegram_id = ?
-            AND t.status = 'CONFIRMED'
-            AND DATE_FORMAT(t.created_at, '%Y-%m') = ?
-        ");
-        $stmt2->execute([$telegram_id, $current_month]);
-        $res2 = $stmt2->fetch(PDO::FETCH_ASSOC);
-        if ($res2) {
-            if ($res2['tot_kwh']) $stats['energy_kwh'] = number_format((float)$res2['tot_kwh'], 2, '.', '');
-            if ($res2['tot_eur']) $stats['spent_eur']  = number_format((float)$res2['tot_eur'],  2, '.', '');
+        $s = $pdo->prepare("SELECT SUM(t.kwh) as tot_kwh,SUM(t.importo_eur) as tot_eur FROM transactions t JOIN users u ON (t.user_id=u.id OR t.user_id=u.telegram_id) WHERE u.telegram_id=? AND t.status='CONFIRMED' AND DATE_FORMAT(t.created_at,'%Y-%m')=?");
+        $s->execute([$telegram_id,$month]);
+        $r = $s->fetch(PDO::FETCH_ASSOC);
+        if ($r) {
+            if ($r['tot_kwh']) $stats['energy_kwh']=number_format((float)$r['tot_kwh'],2,'.','' );
+            if ($r['tot_eur']) $stats['spent_eur'] =number_format((float)$r['tot_eur'], 2,'.','' );
         }
-    } catch (Exception $e) {
-        $errori[] = "Errore Transactions: " . $e->getMessage();
-    }
-
-    if (!empty($errori)) {
-        $stats['debug_msg'] = implode(" | ", $errori);
-    }
-
+    } catch(Exception $e) { $errs[]='Transactions: '.$e->getMessage(); }
+    if ($errs) $stats['debug_msg']=implode(' | ',$errs);
     return $stats;
 }
 ?>

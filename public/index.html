@@ -5,9 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>CaliSync by Fox Energy EV</title>
   <meta name="theme-color" content="#FF9800">
-  <link rel="manifest" href="manifest.json?v=11">
-  <link rel="stylesheet" href="style.css?v=11">
-
+  <link rel="manifest" href="manifest.json?v=13">
+  <link rel="stylesheet" href="style.css?v=13">
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/index.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/Crypto1.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/plugin/WebbleAdapter.global.js"></script>
@@ -18,38 +17,31 @@
   <div id="auth-gate" class="screen">
     <div class="spinner"></div>
     <div id="auth-denied-content" class="hidden">
-      <div style="font-size: 80px; color: white;">🚫</div>
-      <h1 style="color: white; margin: 20px 0;">ACCESSO NEGATO</h1>
-      <p style="color: rgba(255,255,255,0.7); font-size: 16px; margin-bottom: 40px;">
-        La tua licenza CALISYNC è scaduta o è stata sospesa.<br><br>
-        Contatta Fox Energy per regolarizzare la tua posizione.
-      </p>
-      <button class="btn-secondary" style="background: white; color: #B71C1C;" onclick="app.logout()">CAMBIA ACCOUNT</button>
+      <div style="font-size:80px;color:white">🚫</div>
+      <h1 style="color:white;margin:20px 0">ACCESSO NEGATO</h1>
+      <p style="color:rgba(255,255,255,0.7);font-size:16px;margin-bottom:40px">La tua licenza CALISYNC è scaduta o sospesa.<br><br>Contatta Fox Energy per regolarizzare la tua posizione.</p>
+      <button class="btn-secondary" style="background:white;color:#B71C1C" onclick="app.logout()">CAMBIA ACCOUNT</button>
     </div>
   </div>
 
   <!-- Screen 1: Login -->
   <div id="login-screen" class="screen hidden">
-    <div class="container" style="max-width: 400px; display: flex; flex-direction: column; justify-content: center; height: 100%;">
+    <div class="container" style="max-width:400px;display:flex;flex-direction:column;justify-content:center;height:100%">
       <div class="login-header">
         <div class="login-icon-wrap">⚡</div>
-        <h1 style="font-size: 26px; font-weight: 900; letter-spacing: 2px;">FOX ENERGY EV<br>CALISYNC</h1>
-        <p style="color: var(--text-muted); letter-spacing: 1.5px; font-size: 12px; margin-top: 10px;">Terminal Management System</p>
+        <h1 style="font-size:26px;font-weight:900;letter-spacing:2px">FOX ENERGY EV<br>CALISYNC</h1>
+        <p style="color:var(--text-muted);letter-spacing:1.5px;font-size:12px;margin-top:10px">Terminal Management System</p>
       </div>
-
       <div class="input-group">
         <span class="icon">👤</span>
         <input type="text" id="login-username" placeholder="Username Telegram o ID">
       </div>
-
       <div class="input-group">
         <span class="icon">💳</span>
         <input type="password" id="login-card" placeholder="Numero Tessera Fox Energy">
         <button class="icon-right" onclick="app.togglePassword()">👁️</button>
       </div>
-
       <div id="login-error" class="error-msg hidden"></div>
-
       <button id="login-btn" class="btn-primary" onclick="app.login()">ACCEDI AL SISTEMA</button>
     </div>
   </div>
@@ -58,23 +50,15 @@
   <div id="dashboard-screen" class="screen hidden">
     <div class="app-header">
       <span id="dash-header-title">CALISYNC</span>
-      <button class="header-notif-btn" onclick="app.showNotifications()">
-        🔔<span id="notif-header-dot" class="header-badge hidden"></span>
-      </button>
+      <button class="header-notif-btn" onclick="app.showNotifications()">🔔<span id="notif-header-dot" class="header-badge hidden"></span></button>
       <button class="header-action" onclick="app.logout()">🚪</button>
     </div>
-
-    <div class="container" style="padding-bottom: 120px;">
-      <!-- Dashboard Card -->
+    <div class="container" style="padding-bottom:120px">
       <div id="dash-card" class="dashboard-card" onclick="app.showScreen('stats-screen')">
         <div class="dash-top">
-          <div>
-            <div class="dash-title">IL TUO PORTAFOGLIO</div>
-            <div id="dash-premium-badge" class="dash-subtitle">UTENTE STANDARD</div>
-          </div>
-          <div style="font-size: 32px;">💼</div>
+          <div><div class="dash-title">IL TUO PORTAFOGLIO</div><div id="dash-premium-badge" class="dash-subtitle">UTENTE STANDARD</div></div>
+          <div style="font-size:32px">💼</div>
         </div>
-
         <div class="dash-balance-row">
           <div>
             <div class="dash-balance">€ <span id="dash-balance-val">0.00</span></div>
@@ -82,94 +66,54 @@
           </div>
           <div class="dash-details-btn">Riepilogo ▶</div>
         </div>
-
         <div class="dash-divider"></div>
-
         <div class="dash-bottom">
           <div class="dash-bottom-item">🛡️ Karma: <span id="dash-karma-val">0</span></div>
-          <div class="dash-bottom-item" style="flex: 1; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">
-            ⚡ Tariffa: <span id="dash-tariff-val">Standard</span>
-          </div>
+          <div class="dash-bottom-item" style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">⚡ Tariffa: <span id="dash-tariff-val">Standard</span></div>
         </div>
       </div>
-
-      <!-- Config Section -->
-      <div class="section-title">
-        💾 Configurazione Hardware
-      </div>
-
-      <div id="slot-list" class="slot-list">
-        <!-- Rendered via JS -->
-      </div>
+      <div class="section-title">💾 Configurazione Hardware</div>
+      <div id="slot-list" class="slot-list"></div>
     </div>
-
     <div class="sync-bar">
-      <button id="start-sync-btn" class="btn-primary" disabled onclick="app.startSyncFlow()">
-        🔄 INIZIA SINCRONIZZAZIONE
-      </button>
+      <button id="start-sync-btn" class="btn-primary" disabled onclick="app.startSyncFlow()">🔄 INIZIA SINCRONIZZAZIONE</button>
     </div>
   </div>
 
-  <!-- Screen 3: Monthly Stats -->
+  <!-- Screen 3: Stats -->
   <div id="stats-screen" class="screen hidden">
     <div class="app-header">
       <button class="header-back" onclick="app.showScreen('dashboard-screen')">◀</button>
       Riepilogo Mensile
     </div>
-
     <div class="container">
       <div class="stats-header">Statistiche di <span id="stats-month"></span></div>
-
-      <div class="stat-card" style="border-color: rgba(68, 138, 255, 0.3);">
-        <div class="stat-icon-wrap" style="background-color: rgba(68, 138, 255, 0.15); color: #448AFF;">⚡</div>
-        <div>
-          <div class="stat-title">Energia Erogata</div>
-          <div class="stat-value" id="stat-energy">0.00 kWh</div>
-          <div class="stat-subtitle">Totale prelevato dalle colonnine</div>
-        </div>
+      <div class="stat-card" style="border-color:rgba(68,138,255,0.3)">
+        <div class="stat-icon-wrap" style="background-color:rgba(68,138,255,0.15);color:#448AFF">⚡</div>
+        <div><div class="stat-title">Energia Erogata</div><div class="stat-value" id="stat-energy">0.00 kWh</div><div class="stat-subtitle">Totale prelevato dalle colonnine</div></div>
       </div>
-
-      <div class="stat-card" style="border-color: rgba(255, 82, 82, 0.3);">
-        <div class="stat-icon-wrap" style="background-color: rgba(255, 82, 82, 0.15); color: #FF5252;">🔌</div>
-        <div>
-          <div class="stat-title">Spesa Consumi</div>
-          <div class="stat-value" id="stat-spent">€ 0.00</div>
-          <div class="stat-subtitle">Costo totale delle ricariche veicolo</div>
-        </div>
+      <div class="stat-card" style="border-color:rgba(255,82,82,0.3)">
+        <div class="stat-icon-wrap" style="background-color:rgba(255,82,82,0.15);color:#FF5252">🔌</div>
+        <div><div class="stat-title">Spesa Consumi</div><div class="stat-value" id="stat-spent">€ 0.00</div><div class="stat-subtitle">Costo totale delle ricariche veicolo</div></div>
       </div>
-
-      <div class="stat-card" style="border-color: rgba(76, 175, 80, 0.3);">
-        <div class="stat-icon-wrap" style="background-color: rgba(76, 175, 80, 0.15); color: #4CAF50;">💳</div>
-        <div>
-          <div class="stat-title">Fondi Aggiunti</div>
-          <div class="stat-value" id="stat-recharged">€ 0.00</div>
-          <div class="stat-subtitle">Ricariche effettuate sul Wallet FoxEnergy</div>
-        </div>
+      <div class="stat-card" style="border-color:rgba(76,175,80,0.3)">
+        <div class="stat-icon-wrap" style="background-color:rgba(76,175,80,0.15);color:#4CAF50">💳</div>
+        <div><div class="stat-title">Fondi Aggiunti</div><div class="stat-value" id="stat-recharged">€ 0.00</div><div class="stat-subtitle">Ricariche effettuate sul Wallet FoxEnergy</div></div>
       </div>
     </div>
   </div>
 
   <!-- Screen 4: Sync Engine -->
   <div id="sync-screen" class="screen hidden">
-    <div class="app-header">
-      Gestione Terminale
-    </div>
-
-    <div class="container" style="display: flex; flex-direction: column; justify-content: center; height: calc(100vh - 60px);">
+    <div class="app-header">Gestione Terminale</div>
+    <div class="container" style="display:flex;flex-direction:column;justify-content:center;height:calc(100vh - 60px)">
       <div id="sync-icon" class="sync-status-icon working">📶</div>
-
       <div id="sync-progress-container" class="progress-container">
-        <div class="progress-bar-bg">
-          <div id="sync-progress-fill" class="progress-bar-fill"></div>
-        </div>
+        <div class="progress-bar-bg"><div id="sync-progress-fill" class="progress-bar-fill"></div></div>
         <div id="sync-progress-text" class="progress-text">0% Completato</div>
       </div>
-
-      <div id="sync-status-text" class="status-text">
-        Connessione al Chameleon Ultra...
-      </div>
-
-      <div style="margin-top: 60px; padding: 0 20px;">
+      <div id="sync-status-text" class="status-text">Connessione al Chameleon Ultra...</div>
+      <div style="margin-top:60px;padding:0 20px">
         <button id="sync-back-btn" class="btn-secondary hidden" onclick="app.showScreen('dashboard-screen')">TORNA ALLA DASHBOARD</button>
       </div>
     </div>
@@ -182,33 +126,74 @@
       Notifiche
       <span id="notif-badge-header" class="header-badge hidden"></span>
     </div>
-    <div class="container" style="padding-bottom: 40px;">
+    <div class="container" style="padding-bottom:40px">
       <div id="notif-list">
-        <div class="notif-empty">
-          <div style="font-size: 48px; margin-bottom: 16px;">🔔</div>
-          <div style="color: var(--text-muted); font-size: 15px;">Nessuna notifica</div>
-        </div>
+        <div class="notif-empty"><div style="font-size:48px;margin-bottom:16px">🔔</div><div style="color:var(--text-muted);font-size:15px">Nessuna notifica</div></div>
       </div>
     </div>
   </div>
 
-  <!-- Screen 6: Storico Ricariche -->
+  <!-- Screen 6: Storico -->
   <div id="history-screen" class="screen hidden">
     <div class="app-header">
       <button class="header-back" onclick="app.showScreen('dashboard-screen')">◀</button>
       Storico Ricariche
     </div>
-    <div class="container" style="padding-bottom: 40px;">
+    <div class="container" style="padding-bottom:40px">
       <div id="history-list">
-        <div class="notif-empty">
-          <div style="font-size: 48px; margin-bottom: 16px;">⚡</div>
-          <div style="color: var(--text-muted); font-size: 15px;">Nessuna sessione trovata</div>
-        </div>
+        <div class="notif-empty"><div style="font-size:48px;margin-bottom:16px">⚡</div><div style="color:var(--text-muted);font-size:15px">Nessuna sessione trovata</div></div>
       </div>
     </div>
   </div>
 
-  <!-- Slot Picker Bottom Sheet -->
+  <!-- Screen 7: Sessione Sicura Attiva -->
+  <div id="session-screen" class="screen hidden">
+    <div class="app-header"><span>Sessione Attiva</span></div>
+    <div class="container" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:calc(100vh - 60px);text-align:center;padding:30px">
+
+      <div class="session-ring-wrap">
+        <svg class="session-ring" viewBox="0 0 120 120">
+          <circle class="session-ring-bg"   cx="60" cy="60" r="52"/>
+          <circle id="session-ring-fill" class="session-ring-fill" cx="60" cy="60" r="52"
+            stroke-dasharray="326.73" stroke-dashoffset="0"/>
+        </svg>
+        <div class="session-ring-inner">
+          <div id="session-countdown-num" class="session-countdown-num">60</div>
+          <div class="session-countdown-label">secondi</div>
+        </div>
+      </div>
+
+      <div class="session-loaded-label">✅ Tessere caricate</div>
+      <div id="session-slots-summary" class="session-slots-summary"></div>
+      <div id="session-status-msg" class="session-status-msg">
+        Avvicinati alla colonnina e usa il Chameleon Ultra.<br>
+        Gli slot verranno cancellati automaticamente alla scadenza.
+      </div>
+      <div id="session-warning-bar" class="session-warning-bar hidden">
+        ⚠️ Cancellazione in corso tra <span id="session-warning-secs">10</span>s
+      </div>
+      <div style="width:100%;margin-top:30px">
+        <button id="session-cancel-btn" class="btn-danger" onclick="secureSession.cancelSession('manual')">
+          🗑️ CANCELLA ORA E CHIUDI
+        </button>
+        <p style="color:var(--text-muted);font-size:12px;margin-top:14px;line-height:1.6">
+          Premi dopo aver finito di usare la tessera.<br>La cancellazione rimuove tutti i dati dal dispositivo.
+        </p>
+      </div>
+    </div>
+  </div>
+
+  <!-- Screen 8: Cancellazione in corso -->
+  <div id="wipe-screen" class="screen hidden">
+    <div class="container" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;text-align:center">
+      <div id="wipe-icon" style="font-size:80px;margin-bottom:30px">🗑️</div>
+      <div id="wipe-title" style="font-size:22px;font-weight:900;color:white;margin-bottom:15px">CANCELLAZIONE IN CORSO</div>
+      <div id="wipe-status" style="color:rgba(255,255,255,0.7);font-size:15px;line-height:1.7">Connessione al Chameleon Ultra...</div>
+      <div style="margin-top:40px"><div class="spinner"></div></div>
+    </div>
+  </div>
+
+  <!-- Slot Picker -->
   <div id="slot-picker" class="modal-overlay hidden">
     <div class="bottom-sheet">
       <div class="sheet-header">💾 Assegna Dati allo Slot</div>
@@ -216,25 +201,27 @@
     </div>
   </div>
 
-  <!-- First Sync Guide Dialog -->
+  <!-- Sync Dialog -->
   <div id="sync-dialog" class="dialog-overlay hidden">
     <div class="dialog">
-      <div class="dialog-title">💾 Prima Sincronizzazione</div>
+      <div class="dialog-title">💾 Avvio Sessione Sicura</div>
       <div class="dialog-content">
-        <p>Il sistema resetterà e configurerà <strong>automaticamente</strong> tutti gli slot del tuo Chameleon Ultra prima della scrittura.</p>
+        <p>Il sistema caricherà le tessere selezionate e avvierà una <strong>sessione sicura di 60 secondi</strong>.</p>
+        <br>
+        <p>Al termine (o su tua richiesta), gli slot verranno <strong>automaticamente cancellati</strong> dal dispositivo.</p>
         <br>
         <p>Assicurati che:</p>
-        <div class="dialog-list-item">🔹 Il dispositivo sia acceso</div>
-        <div class="dialog-list-item">🔹 Il Bluetooth sia attivo sul telefono</div>
+        <div class="dialog-list-item">🔹 Il dispositivo sia acceso e vicino</div>
+        <div class="dialog-list-item">🔹 Il Bluetooth sia attivo</div>
         <div class="dialog-list-item">🔹 L'app ufficiale Chameleon sia chiusa</div>
       </div>
       <div class="dialog-actions">
         <button class="dialog-btn cancel" onclick="app.hideDialog()">Annulla</button>
-        <button class="dialog-btn confirm" onclick="app.confirmSync()">Ho Capito, Procedi</button>
+        <button class="dialog-btn confirm" onclick="app.confirmSync()">Avvia Sessione</button>
       </div>
     </div>
   </div>
 
-  <script src="app.js?v=11"></script>
+  <script src="app.js?v=13"></script>
 </body>
 </html>

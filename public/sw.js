@@ -1,10 +1,10 @@
-const CACHE_NAME = 'calisync-v11';
+const CACHE_NAME = 'calisync-v13';
 const ASSETS = [
   './',
-  './index.html?v=11',
-  './style.css?v=11',
-  './app.js?v=11',
-  './manifest.json?v=11',
+  './index.html?v=13',
+  './style.css?v=13',
+  './app.js?v=13',
+  './manifest.json?v=13',
   'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/index.global.js',
   'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/Crypto1.global.js',
   'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/plugin/WebbleAdapter.global.js'
@@ -14,28 +14,25 @@ self.addEventListener('install', event => {
   event.waitUntil(
     caches.open(CACHE_NAME)
       .then(cache => cache.addAll(ASSETS))
-      .then(() => self.skipWaiting())
+      .then(() => self.skipWaiting()) // prendi controllo subito senza aspettare reload
   );
 });
 
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys().then(keys => {
-      return Promise.all(
-        keys.filter(key => key !== CACHE_NAME)
-          .map(key => caches.delete(key))
-      );
-    })
+    caches.keys()
+      .then(keys => Promise.all(
+        keys.filter(key => key !== CACHE_NAME).map(key => caches.delete(key))
+      ))
+      .then(() => self.clients.claim()) // ← FIX: prendi controllo di tutte le tab aperte
   );
 });
 
 self.addEventListener('fetch', event => {
-  // Sempre rete per le API
-  if (event.request.url.includes('app_api.php')) {
-    return;
-  }
+  // Sempre rete per le API — mai cache
+  if (event.request.url.includes('app_api.php')) return;
 
-  // Network-first per gli asset statici
+  // Network-first: prova rete, fallback su cache
   event.respondWith(
     fetch(event.request)
       .then(networkResponse => {
@@ -44,10 +41,8 @@ self.addEventListener('fetch', event => {
           return networkResponse;
         });
       })
-      .catch(() => {
-        return caches.match(event.request).then(cachedResponse => {
-          return cachedResponse || new Response('Offline');
-        });
-      })
+      .catch(() =>
+        caches.match(event.request).then(r => r || new Response('Offline'))
+      )
   );
 });
