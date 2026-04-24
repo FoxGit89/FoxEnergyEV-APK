@@ -168,6 +168,61 @@ try {
         exit;
     }
 
+    // ── Notifica tutti gli admin da tabella admin_users.chat_id ──
+    if ($action === 'notify_admin') {
+        $event = $_GET['event'] ?? 'unknown';
+        $slots = $_GET['slots'] ?? '';
+        $error = $_GET['error'] ?? '';
+        $token = getenv('BOT_TOKEN');
+
+        if ($token) {
+            $u_name = $user['username'] ?? $user_id;
+            $msg = "⚠️ <b>ALERT CALISYNC</b>\n";
+            $msg .= "👤 Utente: @{$u_name} (ID: {$user_id})\n";
+            if ($event === 'ble_disconnected_during_session') {
+                $msg .= "🔴 Evento: <b>BLE DISCONNESSO durante sessione attiva</b>\n";
+                $msg .= "💾 Slot caricati: {$slots}\n";
+                if ($error) $msg .= "❌ Errore: {$error}\n";
+                $msg .= "\n⚠️ Gli slot potrebbero <b>NON</b> essere stati cancellati!";
+            } else {
+                $msg .= "📋 Evento: {$event}\n";
+                if ($slots) $msg .= "💾 Slot: {$slots}";
+            }
+
+            // Leggi tutti gli admin_chat_id dalla tabella admin_users
+            try {
+                $admins = db()->query("SELECT chat_id FROM admin_users WHERE chat_id IS NOT NULL AND chat_id != ''")->fetchAll(PDO::FETCH_COLUMN);
+                foreach ($admins as $chat_id) {
+                    @file_get_contents(
+                        "https://api.telegram.org/bot{$token}/sendMessage?chat_id=" . urlencode($chat_id) .
+                        "&text=" . urlencode($msg) . "&parse_mode=HTML"
+                    );
+                }
+            } catch (Exception $e) {
+                // Tabella non trovata o errore: ignora silenziosamente
+            }
+        }
+        echo json_encode(['success' => true]);
+        exit;
+    }
+
+
+    // ── Sessione sicura ──
+    if ($action === 'start_session' || $action === 'end_session') {
+        try {
+            db()->exec("CREATE TABLE IF NOT EXISTS active_sessions(id INT UNSIGNED AUTO_INCREMENT PRIMARY KEY, user_id VARCHAR(64), status VARCHAR(20) DEFAULT 'active', started_at DATETIME DEFAULT CURRENT_TIMESTAMP, ended_at DATETIME) ENGINE=InnoDB");
+            if ($action === 'start_session') {
+                db()->prepare("UPDATE active_sessions SET status='expired',ended_at=NOW() WHERE user_id=? AND status='active'")->execute([$user_id]);
+                db()->prepare("INSERT INTO active_sessions(user_id,status) VALUES(?,'active')")->execute([$user_id]);
+            } else {
+                db()->prepare("UPDATE active_sessions SET status='ended',ended_at=NOW() WHERE user_id=? AND status='active'")->execute([$user_id]);
+            }
+        } catch(Exception $e) {}
+        echo json_encode(['success' => true]);
+        exit;
+    }
+
+
 } catch (Exception $e) {
     echo json_encode(['error' => 'Errore interno del database.']);
     exit;

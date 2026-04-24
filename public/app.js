@@ -138,9 +138,10 @@ const app = {
   },
 
   renderSlots() {
+    // Popola solo la connect-screen (la dashboard ha solo il pulsante Collega)
     let canSync=false;
-    const makeCards=(listId)=>{
-      const list=document.getElementById(listId); if(!list)return;
+    const list=document.getElementById('connect-slot-list');
+    if (list) {
       list.innerHTML='';
       for (let i=1;i<=8;i++) {
         const card=this.mapping[i]; if(card)canSync=true;
@@ -150,10 +151,7 @@ const app = {
         div.innerHTML=`<div class="slot-num">${i}</div><div class="slot-title">${card?card.slot_label:'Nessun dato assegnato'}</div><div class="slot-icon">📝</div>`;
         list.appendChild(div);
       }
-    };
-    makeCards('slot-list');         // dashboard
-    makeCards('connect-slot-list'); // connect-screen
-    // Mostra/nascondi pulsante sincronizza nella connect-screen
+    }
     const syncBtn=document.getElementById('connect-proceed-btn');
     if (syncBtn) { if(canSync)syncBtn.classList.remove('hidden'); else syncBtn.classList.add('hidden'); }
   },
@@ -260,6 +258,43 @@ const secureSession = {
       if(rem<=0)this.cancel('auto');
       else{this._tick(rem);if(!this._timer){this._timer=setInterval(()=>{const r=Math.max(0,SESSION_TIMEOUT_SEC-Math.floor((Date.now()-this._startedAt)/1000));this._tick(r);if(r<=0){clearInterval(this._timer);this._timer=null;this.cancel('auto');}},500);}}
     });
+    // SICUREZZA: blocca navigazione browser durante sessione attiva
+    window.addEventListener('beforeunload', this._onUnload=e=>{
+      if (!this._wiping && this._startedAt) { e.preventDefault(); e.returnValue='Sessione attiva! Premi "Cancella ora" prima di uscire.'; }
+    });
+    // SICUREZZA: intercetta tasto Back Android (history.back)
+    history.pushState(null, '', location.href);
+    window.addEventListener('popstate', this._onPop=()=>{
+      if (!this._wiping && this._startedAt) {
+        history.pushState(null,'',location.href); // rimetti nello stack
+        this._showBlockAlert();
+      }
+    });
+  },
+
+  _showBlockAlert() {
+    // Mostra overlay di blocco invece di lasciare uscire
+    const existing=document.getElementById('session-block-overlay');
+    if (existing) { existing.classList.remove('hidden'); return; }
+    const overlay=document.createElement('div');
+    overlay.id='session-block-overlay';
+    overlay.style.cssText='position:fixed;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.85);z-index:9999;display:flex;flex-direction:column;align-items:center;justify-content:center;text-align:center;padding:30px';
+    overlay.innerHTML=`
+      <div style="font-size:60px;margin-bottom:20px">⚠️</div>
+      <div style="font-size:20px;font-weight:900;color:white;margin-bottom:15px">SESSIONE ATTIVA</div>
+      <div style="font-size:15px;color:rgba(255,255,255,0.7);margin-bottom:30px;line-height:1.7">
+        Non puoi uscire con le tessere caricate.<br>
+        Premi il pulsante qui sotto per cancellare<br>gli slot e chiudere la sessione in sicurezza.
+      </div>
+      <button onclick="document.getElementById('session-block-overlay').classList.add('hidden');secureSession.cancel('manual')" 
+        style="background:#B71C1C;color:white;padding:16px 32px;border-radius:15px;font-size:16px;font-weight:900;border:none;cursor:pointer;width:100%">
+        🗑️ CANCELLA E CHIUDI SESSIONE
+      </button>
+      <button onclick="document.getElementById('session-block-overlay').classList.add('hidden')"
+        style="background:transparent;color:rgba(255,255,255,0.5);padding:12px;border:none;cursor:pointer;margin-top:10px;font-size:14px">
+        Torna alla sessione
+      </button>`;
+    document.body.appendChild(overlay);
   },
 
   _tick(rem) {
@@ -286,6 +321,9 @@ const secureSession = {
     this._wiping=true;
     if (this._timer){clearInterval(this._timer);this._timer=null;}
     if (this._onVis) document.removeEventListener('visibilitychange',this._onVis);
+    if (this._onUnload) window.removeEventListener('beforeunload',this._onUnload);
+    if (this._onPop)    window.removeEventListener('popstate',this._onPop);
+    const overlay=document.getElementById('session-block-overlay'); if(overlay)overlay.remove();
     document.getElementById('session-cancel-btn').disabled=true;
     app.showScreen('wipe-screen');
     const setWipe=(icon,title,status)=>{
@@ -301,9 +339,16 @@ const secureSession = {
       setTimeout(()=>{this._wiping=false;app.showScreen('dashboard-screen');},2000);
     } catch(err) {
       console.error('[WIPE ERROR]',err);
-      // BLE perso durante sessione — sicurezza: logout forzato
-      setWipe('🔒','SESSIONE INTERROTTA','Connessione persa durante la sessione.\n\nPer sicurezza verrai disconnesso.\nContatta Fox Energy se necessario.');
-      this._startedAt=null; this._wiping=false;
+      // BLE perso: notifica admin e logout sicuro
+      app.apiCall({
+        action: 'notify_admin',
+        user_id: app.user.telegramId,
+        event: 'ble_disconnected_during_session',
+        slots: this._slotLabels.join(','),
+        error: (err.message||'').substring(0,100),
+      }).catch(()=>{});
+      setWipe('🔒','SESSIONE INTERROTTA','Connessione persa durante la sessione attiva.\n\nGli amministratori sono stati avvisati.\nVerrai disconnesso tra pochi secondi.');
+      this._startedAt=null; this._slotLabels=[]; this._wiping=false;
       setTimeout(()=>app.logout(),4000);
     }
   },
@@ -337,11 +382,11 @@ window.bleEngine = {
     else document.getElementById('sync-back-btn').classList.add('hidden');
   },
 
-  // ── PASSO 1: Connetti e leggi stato attuale degli slot ──
+  // ── PASSO 1: Connetti → cancella subito → mostra selezione slot ──
   async connectAndRead(telegramId) {
     this.setConnectStatus('📶','CONNESSIONE IN CORSO','Seleziona il Chameleon Ultra nel popup Bluetooth...');
     try {
-      const { ChameleonUltra, FreqType } = window.ChameleonUltraJS;
+      const { ChameleonUltra, TagType, FreqType, DeviceMode } = window.ChameleonUltraJS;
 
       // Connessione — pattern identico v10
       if (this.ultra) { try{await this.ultra.disconnect();}catch(e){} this.ultra=null; }
@@ -349,33 +394,27 @@ window.bleEngine = {
       await this.ultra.use(new window.ChameleonUltraJS.WebbleAdapter());
       await this.ultra.connect();
 
-      this.setConnectStatus('🔍','CONNESSO','Lettura configurazione attuale...');
-
-      // Leggi nome di ogni slot attivo
-      const slotStatus = [];
+      // Cancella immediatamente tutti gli slot per sicurezza
+      this.setConnectStatus('🧹','PULIZIA IN CORSO','Cancellazione slot precedenti...');
       for (let i=0; i<8; i++) {
-        let name = '';
-        try { name = await this.ultra.cmdSlotGetFreqName(i, FreqType.HF); } catch(e) {}
-        slotStatus.push(name || null);
+        await this.ultra.cmdSlotChangeTagType(i, TagType.MIFARE_1024);
+        await this.ultra.cmdSlotResetTagType(i, TagType.MIFARE_1024);
+        await this.ultra.cmdSlotSetEnable(i, FreqType.HF, false);
+        await this.ultra.cmdSlotDeleteFreqName(i, FreqType.HF).catch(()=>{});
+        await new Promise(r=>setTimeout(r,30));
       }
+      await this.ultra.cmdSlotSaveSettings();
+      await new Promise(r=>setTimeout(r,100));
+      await this.ultra.cmdChangeDeviceMode(DeviceMode.TAG);
 
-      // Mostra stato slot nella connect-screen
-      const statusEl=document.getElementById('connect-slot-status');
-      if (statusEl) {
-        const anyActive=slotStatus.some(n=>n);
-        statusEl.innerHTML = slotStatus.map((n,i)=>
-          `<div class="slot-status-row ${n?'active':'empty'}">
-            <span class="slot-status-num">${i+1}</span>
-            <span class="slot-status-label">${n||'— vuoto —'}</span>
-          </div>`
-        ).join('');
-        document.getElementById('connect-slot-label').textContent =
-          anyActive ? 'Slot attualmente caricati:' : 'Nessun slot caricato.';
-      }
+      // Reset mapping locale
+      app.mapping = { 1:null,2:null,3:null,4:null,5:null,6:null,7:null,8:null };
+      app.renderSlots();
 
-      this.setConnectStatus('✅','CHAMELEON CONNESSO','Dispositivo pronto. Seleziona le tessere da caricare e premi Sincronizza.');
+      this.setConnectStatus('✅','PRONTO','Chameleon pulito. Seleziona le tessere da caricare.');
       document.getElementById('connect-back-btn').classList.add('hidden');
-      document.getElementById('connect-proceed-btn').classList.remove('hidden');
+      // Mostra la sezione selezione slot
+      document.getElementById('connect-config-section').classList.remove('hidden');
 
     } catch(err) {
       console.error('[CONNECT ERROR]',err);

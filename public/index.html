@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>CaliSync by Fox Energy EV</title>
   <meta name="theme-color" content="#FF9800">
-  <link rel="manifest" href="manifest.json?v=25">
-  <link rel="stylesheet" href="style.css?v=25">
+  <link rel="manifest" href="manifest.json?v=27">
+  <link rel="stylesheet" href="style.css?v=27">
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/index.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/Crypto1.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/plugin/WebbleAdapter.global.js"></script>
@@ -74,12 +74,12 @@
           <div class="dash-bottom-item" style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">⚡ Tariffa: <span id="dash-tariff-val">Standard</span></div>
         </div>
       </div>
-      <div class="section-title">💾 Configurazione Hardware</div>
-      <div id="slot-list" class="slot-list"></div>
     </div>
+    <!-- Pulsante unico grande centrato -->
     <div class="sync-bar">
-      <!-- Pulsante principale: connette il Chameleon e mostra stato attuale -->
-      <button class="btn-primary" onclick="app.startConnectFlow()">🔗 COLLEGA CHAMELEON E CONFIGURA</button>
+      <button class="btn-primary btn-connect-main" onclick="app.startConnectFlow()">
+        🔗 COLLEGA CHAMELEON ULTRA
+      </button>
     </div>
   </div>
 
@@ -118,20 +118,14 @@
       <div id="connect-title" style="font-size:18px;font-weight:900;margin-bottom:12px">CONNESSIONE IN CORSO</div>
       <div id="connect-status" style="font-size:14px;color:var(--text-muted);line-height:1.7;margin-bottom:30px;padding:0 20px">Seleziona il Chameleon Ultra nel popup Bluetooth...</div>
 
-      <!-- Stato slot attuali -->
-      <div id="connect-slot-section" style="width:100%;margin-bottom:24px">
-        <div id="connect-slot-label" style="font-size:13px;color:var(--text-muted);font-weight:700;letter-spacing:1px;margin-bottom:12px;text-align:left">Lettura in corso...</div>
-        <div id="connect-slot-status" style="width:100%"></div>
-      </div>
-
-      <!-- Scelta tessere da caricare -->
-      <div id="connect-config-section" style="width:100%;margin-bottom:24px">
-        <div class="section-title" style="padding:0;margin-bottom:10px">💾 Seleziona tessere da caricare</div>
+      <!-- Selezione tessere (nascosta finché non connesso e pulito) -->
+      <div id="connect-config-section" class="hidden" style="width:100%;margin-bottom:24px">
+        <div class="section-title" style="padding:0;margin-bottom:10px;font-size:14px;color:var(--text-muted)">💾 Seleziona le tessere da caricare:</div>
         <div id="connect-slot-list" class="slot-list" style="padding-bottom:0"></div>
       </div>
 
       <button id="connect-proceed-btn" class="btn-primary hidden" onclick="app.startSyncFlow()" style="margin-bottom:12px">
-        🔄 SINCRONIZZA SELEZIONE
+        🔄 CARICA TESSERE SELEZIONATE
       </button>
       <button id="connect-back-btn" class="btn-secondary hidden" onclick="app.showScreen('dashboard-screen')">
         TORNA ALLA DASHBOARD
@@ -227,6 +221,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=25"></script>
+  <script src="app.js?v=27"></script>
 </body>
 </html>
