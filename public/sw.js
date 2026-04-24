@@ -1,13 +1,13 @@
-const CACHE_NAME = 'calisync-v22';
+const CACHE_NAME = 'calisync-v24';
 const ASSETS = [
   './',
-  './index.html?v=22',
-  './style.css?v=22',
-  './app.js?v=22',
-  './manifest.json?v=22',
-  'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0.4.6/dist/index.global.js',
-  'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0.4.6/dist/Crypto1.global.js',
-  'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0.4.6/dist/plugin/WebbleAdapter.global.js'
+  './index.html?v=24',
+  './style.css?v=24',
+  './app.js?v=24',
+  './manifest.json?v=24',
+  'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/index.global.js',
+  'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/Crypto1.global.js',
+  'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/plugin/WebbleAdapter.global.js'
 ];
 
 self.addEventListener('install', event => {
@@ -20,17 +20,36 @@ self.addEventListener('install', event => {
 
 self.addEventListener('activate', event => {
   event.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(keys.filter(k => k !== CACHE_NAME).map(k => caches.delete(k))))
-      .then(() => self.clients.claim())
+    caches.keys().then(keys => {
+      return Promise.all(
+        keys.filter(key => key !== CACHE_NAME)
+          .map(key => caches.delete(key))
+      );
+    }).then(() => self.clients.claim())
   );
 });
 
 self.addEventListener('fetch', event => {
-  if (event.request.url.includes('app_api.php')) return;
+  // Always hit network for API
+  if (event.request.url.includes('app_api.php')) {
+    return;
+  }
+
+  // Network-first strategy for static assets to avoid aggressive caching issues
   event.respondWith(
     fetch(event.request)
-      .then(res => caches.open(CACHE_NAME).then(cache => { cache.put(event.request, res.clone()); return res; }))
-      .catch(() => caches.match(event.request).then(r => r || new Response('Offline')))
+      .then(networkResponse => {
+        // Cache the fresh response for later offline use
+        return caches.open(CACHE_NAME).then(cache => {
+          cache.put(event.request, networkResponse.clone());
+          return networkResponse;
+        });
+      })
+      .catch(() => {
+        // If network fails (offline), fallback to cache
+        return caches.match(event.request).then(cachedResponse => {
+           return cachedResponse || new Response('Offline');
+        });
+      })
   );
 });
