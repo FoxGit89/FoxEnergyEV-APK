@@ -198,30 +198,68 @@ const app = {
 };
 
 // ============================================================
-// RILEVAMENTO TIPO TESSERA (identico v10)
+// RILEVAMENTO TIPO TESSERA
+// Usa il campo "tag" del JSON Chameleon come fonte primaria.
+// SAK/ATQA come fallback per tessere senza campo tag.
 // ============================================================
 function detectCardProfile(res) {
   const { TagType, Buffer } = window.ChameleonUltraJS;
   const blocks=res.data||[], numBlocks=blocks.length, totalBytes=numBlocks*16;
+
+  // Normalizza UID
   let uidHex='';
   if (typeof res.uid==='string') uidHex=res.uid.replace(/\s+/g,'');
   else if (Array.isArray(res.uid)) uidHex=res.uid.map(b=>b.toString(16).padStart(2,'0')).join('');
   const uidLen=uidHex.length/2;
+
+  // Normalizza ATQA
   let atqaBytes;
   if (Array.isArray(res.atqa)) atqaBytes=res.atqa;
   else if (typeof res.atqa==='string'){const h=res.atqa.replace(/\s+/g,'');atqaBytes=[parseInt(h.slice(0,2),16),parseInt(h.slice(2,4),16)];}
   else atqaBytes=[0,0];
+
+  // SAK originale dalla tessera (usato per anti-collision, anche se 0)
   const sak=typeof res.sak==='number'?res.sak:parseInt(res.sak||'0',16);
-  const sakMasked=sak&0x7F;
-  let tagType,writeMode,tagName;
-  if (sakMasked===0x09){tagType=TagType.MIFARE_Mini;writeMode='mf1';tagName='MIFARE Mini';}
-  else if (sakMasked===0x08&&totalBytes<=1024){tagType=TagType.MIFARE_1024;writeMode='mf1';tagName=`MIFARE 1K${uidLen===7?' (7B)':''}`;}
-  else if ((sakMasked===0x18||sakMasked===0x08)&&totalBytes>1024){tagType=TagType.MIFARE_2048;writeMode='mf1';tagName=`MIFARE 4K${uidLen===7?' (7B)':''}`;}
-  else if (sakMasked===0x00&&totalBytes<=64){tagType=TagType.MifareUltralight;writeMode='ultralight';tagName='Ultralight';}
-  else if (sakMasked===0x00&&totalBytes<=192){tagType=TagType.NTAG_213;writeMode='ultralight';tagName='NTAG213';}
-  else if (sakMasked===0x00&&totalBytes<=540){tagType=TagType.NTAG_215;writeMode='ultralight';tagName='NTAG215';}
-  else if (sakMasked===0x00&&totalBytes<=924){tagType=TagType.NTAG_216;writeMode='ultralight';tagName='NTAG216';}
-  else{tagType=null;writeMode='unsupported';tagName=`Sconosciuto (SAK=0x${sak.toString(16).toUpperCase()}, ${totalBytes}B)`;}
+
+  let tagType, writeMode, tagName;
+
+  // ── METODO 1: usa campo "tag" del JSON Chameleon (autoritativo) ──
+  // I codici corrispondono ai valori enum TagType della libreria
+  const tagCode = res.tag || res.tag_type || null;
+  if (tagCode) {
+    const tagMap = {
+      1001: [TagType.MIFARE_1024,     'mf1',        `MIFARE 1K${uidLen===7?' (7B)':''}`],
+      1002: [TagType.MIFARE_2048,     'mf1',        `MIFARE 4K${uidLen===7?' (7B)':''}`],
+      1003: [TagType.MIFARE_Mini,     'mf1',        'MIFARE Mini'],
+      1004: [TagType.MifareUltralight,'ultralight', 'Ultralight'],
+      1005: [TagType.NTAG_213,        'ultralight', 'NTAG213'],
+      1006: [TagType.NTAG_215,        'ultralight', 'NTAG215'],
+      1007: [TagType.NTAG_216,        'ultralight', 'NTAG216'],
+    };
+    const mapped = tagMap[tagCode];
+    if (mapped) {
+      [tagType, writeMode, tagName] = mapped;
+      console.log(`[detectCardProfile] tag=${tagCode} → ${tagName}`);
+    }
+  }
+
+  // ── METODO 2: fallback su SAK + dimensione (per tessere senza campo tag) ──
+  if (!tagType) {
+    const sakMasked=sak&0x7F;
+    if      (sakMasked===0x09)                              { tagType=TagType.MIFARE_Mini;      writeMode='mf1';        tagName='MIFARE Mini'; }
+    else if (sakMasked===0x08&&totalBytes<=1024)             { tagType=TagType.MIFARE_1024;     writeMode='mf1';        tagName=`MIFARE 1K${uidLen===7?' (7B)':''}`; }
+    else if ((sakMasked===0x18||sakMasked===0x08)&&totalBytes>1024){ tagType=TagType.MIFARE_2048;writeMode='mf1';       tagName=`MIFARE 4K${uidLen===7?' (7B)':''}`; }
+    else if (sakMasked===0x00&&totalBytes<=64)               { tagType=TagType.MifareUltralight;writeMode='ultralight'; tagName='Ultralight'; }
+    else if (sakMasked===0x00&&totalBytes<=192)              { tagType=TagType.NTAG_213;        writeMode='ultralight'; tagName='NTAG213'; }
+    else if (sakMasked===0x00&&totalBytes<=540)              { tagType=TagType.NTAG_215;        writeMode='ultralight'; tagName='NTAG215'; }
+    else if (sakMasked===0x00&&totalBytes<=924)              { tagType=TagType.NTAG_216;        writeMode='ultralight'; tagName='NTAG216'; }
+    // ── METODO 3: fallback su dimensione pura (ultimo tentativo) ──
+    else if (totalBytes<=1024)  { tagType=TagType.MIFARE_1024; writeMode='mf1'; tagName=`MIFARE 1K (fallback dim, SAK=0x${sak.toString(16).toUpperCase()})`; }
+    else if (totalBytes<=2048)  { tagType=TagType.MIFARE_2048; writeMode='mf1'; tagName=`MIFARE 4K (fallback dim, SAK=0x${sak.toString(16).toUpperCase()})`; }
+    else { tagType=null; writeMode='unsupported'; tagName=`Non supportato (SAK=0x${sak.toString(16).toUpperCase()}, ${totalBytes}B)`; }
+    console.log(`[detectCardProfile] fallback SAK=0x${sak.toString(16)} totalBytes=${totalBytes} → ${tagName}`);
+  }
+
   const flatBytes=[];
   for (const block of blocks) for (const byte of block) flatBytes.push(byte);
   return { tagType,writeMode,tagName,numBlocks,uid:Buffer.from(uidHex,'hex'),atqa:Buffer.from(atqaBytes),sak:Buffer.from([sak]),ats:Buffer.alloc(0),body:Buffer.from(flatBytes) };
