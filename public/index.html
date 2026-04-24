@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>CaliSync by Fox Energy EV</title>
   <meta name="theme-color" content="#FF9800">
-  <link rel="manifest" href="manifest.json?v=19">
-  <link rel="stylesheet" href="style.css?v=19">
+  <link rel="manifest" href="manifest.json?v=21">
+  <link rel="stylesheet" href="style.css?v=21">
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/index.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/Crypto1.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/plugin/WebbleAdapter.global.js"></script>
@@ -19,7 +19,7 @@
     <div id="auth-denied-content" class="hidden">
       <div style="font-size:80px;color:white">🚫</div>
       <h1 style="color:white;margin:20px 0">ACCESSO NEGATO</h1>
-      <p style="color:rgba(255,255,255,0.7);font-size:16px;margin-bottom:40px">La tua licenza CALISYNC è scaduta o sospesa.<br><br>Contatta Fox Energy per regolarizzare la tua posizione.</p>
+      <p style="color:rgba(255,255,255,0.7);font-size:16px;margin-bottom:40px">La tua licenza CALISYNC è scaduta o è stata sospesa.<br><br>Contatta Fox Energy per regolarizzare la tua posizione.</p>
       <button class="btn-secondary" style="background:white;color:#B71C1C" onclick="app.logout()">CAMBIA ACCOUNT</button>
     </div>
   </div>
@@ -56,7 +56,10 @@
     <div class="container" style="padding-bottom:120px">
       <div id="dash-card" class="dashboard-card" onclick="app.showScreen('stats-screen')">
         <div class="dash-top">
-          <div><div class="dash-title">IL TUO PORTAFOGLIO</div><div id="dash-premium-badge" class="dash-subtitle">UTENTE STANDARD</div></div>
+          <div>
+            <div class="dash-title">IL TUO PORTAFOGLIO</div>
+            <div id="dash-premium-badge" class="dash-subtitle">UTENTE STANDARD</div>
+          </div>
           <div style="font-size:32px">💼</div>
         </div>
         <div class="dash-balance-row">
@@ -124,7 +127,6 @@
     <div class="app-header">
       <button class="header-back" onclick="app.showScreen('dashboard-screen')">◀</button>
       Notifiche
-      <span id="notif-badge-header" class="header-badge hidden"></span>
     </div>
     <div class="container" style="padding-bottom:40px">
       <div id="notif-list">
@@ -146,44 +148,32 @@
     </div>
   </div>
 
-  <!-- Screen 7: Sessione Sicura Attiva -->
+  <!-- Screen 7: Sessione Sicura -->
   <div id="session-screen" class="screen hidden">
     <div class="app-header"><span>Sessione Attiva</span></div>
     <div class="container" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:calc(100vh - 60px);text-align:center;padding:30px">
-
       <div class="session-ring-wrap">
         <svg class="session-ring" viewBox="0 0 120 120">
-          <circle class="session-ring-bg"   cx="60" cy="60" r="52"/>
-          <circle id="session-ring-fill" class="session-ring-fill" cx="60" cy="60" r="52"
-            stroke-dasharray="326.73" stroke-dashoffset="0"/>
+          <circle class="session-ring-bg" cx="60" cy="60" r="52"/>
+          <circle id="session-ring-fill" class="session-ring-fill" cx="60" cy="60" r="52" stroke-dasharray="326.73" stroke-dashoffset="0"/>
         </svg>
         <div class="session-ring-inner">
           <div id="session-countdown-num" class="session-countdown-num">60</div>
           <div class="session-countdown-label">secondi</div>
         </div>
       </div>
-
       <div class="session-loaded-label">✅ Tessere caricate</div>
       <div id="session-slots-summary" class="session-slots-summary"></div>
-      <div id="session-status-msg" class="session-status-msg">
-        Avvicinati alla colonnina e usa il Chameleon Ultra.<br>
-        Gli slot verranno cancellati automaticamente alla scadenza.
-      </div>
-      <div id="session-warning-bar" class="session-warning-bar hidden">
-        ⚠️ Cancellazione in corso tra <span id="session-warning-secs">10</span>s
-      </div>
+      <div id="session-status-msg" class="session-status-msg">Avvicinati alla colonnina e usa il Chameleon Ultra.<br>Gli slot verranno cancellati automaticamente alla scadenza.</div>
+      <div id="session-warning-bar" class="session-warning-bar hidden">⚠️ Cancellazione in corso tra <span id="session-warning-secs">10</span>s</div>
       <div style="width:100%;margin-top:30px">
-        <button id="session-cancel-btn" class="btn-danger" onclick="secureSession.cancelSession('manual')">
-          🗑️ CANCELLA ORA E CHIUDI
-        </button>
-        <p style="color:var(--text-muted);font-size:12px;margin-top:14px;line-height:1.6">
-          Premi dopo aver finito di usare la tessera.<br>La cancellazione rimuove tutti i dati dal dispositivo.
-        </p>
+        <button id="session-cancel-btn" class="btn-danger" onclick="secureSession.cancelSession('manual')">🗑️ CANCELLA ORA E CHIUDI</button>
+        <p style="color:var(--text-muted);font-size:12px;margin-top:14px;line-height:1.6">Premi dopo aver finito di usare la tessera.<br>La cancellazione rimuove tutti i dati dal dispositivo.</p>
       </div>
     </div>
   </div>
 
-  <!-- Screen 8: Cancellazione in corso -->
+  <!-- Screen 8: Wipe in corso -->
   <div id="wipe-screen" class="screen hidden">
     <div class="container" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:100vh;text-align:center">
       <div id="wipe-icon" style="font-size:80px;margin-bottom:30px">🗑️</div>
@@ -217,11 +207,11 @@
       </div>
       <div class="dialog-actions">
         <button class="dialog-btn cancel" onclick="app.hideDialog()">Annulla</button>
-        <button class="dialog-btn confirm" onclick="app.confirmSync()">Avvia Sessione</button>
+        <button class="dialog-btn confirm" onclick="app.confirmSync()">Ho capito, Procedi</button>
       </div>
     </div>
   </div>
 
-  <script src="app.js?v=19"></script>
+  <script src="app.js?v=21"></script>
 </body>
 </html>
