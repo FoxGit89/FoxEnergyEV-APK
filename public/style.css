@@ -1153,3 +1153,59 @@ input {
 .tariffa-info { flex: 1; min-width: 0; }
 .tariffa-desc { font-size: 13px; font-weight: 600; }
 .tariffa-orario { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
+
+/* ==========================================
+   Istruzioni uso — dashboard
+   ========================================== */
+.how-to-section {
+  padding: 4px 15px 8px;
+}
+.how-to-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 10px;
+  padding-left: 2px;
+}
+.how-to-steps {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.how-to-step {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  background: var(--bg-card);
+  border-radius: 14px;
+  padding: 12px 14px;
+  border-left: 3px solid rgba(255,152,0,0.4);
+}
+.how-to-step.warn {
+  border-left-color: rgba(255,152,0,0.7);
+  background: rgba(255,152,0,0.06);
+}
+.step-num {
+  width: 26px;
+  height: 26px;
+  border-radius: 50%;
+  background: rgba(255,152,0,0.15);
+  color: var(--primary-orange);
+  font-size: 13px;
+  font-weight: 900;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.how-to-step.warn .step-num {
+  background: transparent;
+  font-size: 18px;
+  width: 26px;
+}
+.step-body      { flex: 1; }
+.step-title     { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
+.step-desc      { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
