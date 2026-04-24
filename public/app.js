@@ -326,44 +326,83 @@ const app = {
 
   _renderHistory(list, d) {
     const txs = d.transactions||[], recs = d.recharges||[];
-    if (!txs.length && !recs.length) { list.innerHTML='<div class="empty-state">📋<br>Nessuna transazione</div>'; return; }
-    const statusMap = {
-      'CONFIRMED':'✅ Confermata','PENDING':'⏳ In attesa',
-      'IN PROGRESS':'🔄 In corso','REJECTED':'❌ Rifiutata',
-    };
-    let html = '';
-    if (txs.length) {
-      html += '<div class="history-section-title">⚡ Ricariche Veicolo</div>';
-      html += txs.map(t=>`
-        <div class="history-card">
-          <div class="history-left">
-            <div class="history-kwh">${parseFloat(t.kwh||0).toFixed(3)} kWh</div>
-            <div class="history-desc">${this._esc(t.slot_label||t.service_description||'Ricarica')}</div>
-            ${t.operator_name?`<div class="history-op">🔌 ${this._esc(t.operator_name)}</div>`:''}
-          </div>
-          <div class="history-right">
-            <div class="history-eur">€ ${parseFloat(t.importo_eur||0).toFixed(2)}</div>
-            <div class="history-status">${statusMap[t.status]||t.status}</div>
-            <div class="history-date">${this._formatDate(t.created_at)}</div>
-          </div>
-        </div>`).join('');
+    if (!txs.length && !recs.length) {
+      list.innerHTML='<div class="empty-state">📋<br>Nessuna transazione</div>'; return;
     }
+
+    const statusInfo = {
+      'CONFIRMED':   {icon:'✅', label:'Confermata',  cls:'s-confirmed'},
+      'PENDING':     {icon:'⏳', label:'In attesa',   cls:'s-pending'},
+      'IN PROGRESS': {icon:'🔄', label:'In corso',    cls:'s-progress'},
+      'REJECTED':    {icon:'❌', label:'Rifiutata',   cls:'s-rejected'},
+    };
+
+    let html = '';
+
+    // ── Dichiarazioni di consumo (transactions) ──
+    if (txs.length) {
+      html += '<div class="history-section-title">⚡ Dichiarazioni di Consumo</div>';
+      html += txs.map(t => {
+        const st  = statusInfo[t.status] || {icon:'❓', label:t.status, cls:'s-pending'};
+        const kwh = parseFloat(t.kwh||0).toFixed(3);
+        const eur = parseFloat(t.importo_eur||0).toFixed(2);
+        const tar = t.tariffa_eur_kwh ? `€ ${parseFloat(t.tariffa_eur_kwh).toFixed(5)}/kWh` : '';
+        // Data evento significativa in base allo stato
+        const eventDate = t.status==='CONFIRMED' ? t.approved_at
+                        : t.status==='REJECTED'  ? t.rejected_at
+                        : t.status==='IN PROGRESS'? t.in_progress_at
+                        : t.pending_at || t.created_at;
+        return `
+        <div class="history-card tx-card">
+          <div class="tx-status-bar ${st.cls}"></div>
+          <div class="tx-body">
+            <div class="tx-top">
+              <div class="tx-kwh">${kwh} <span>kWh</span></div>
+              <div class="tx-eur">€ ${eur}</div>
+            </div>
+            <div class="tx-details">
+              ${t.slot_label ? `<span class="tx-tag tag-slot">📍 ${this._esc(t.slot_label)}</span>` : ''}
+              ${t.operator_name ? `<span class="tx-tag tag-op">🔌 ${this._esc(t.operator_name)}</span>` : ''}
+              ${t.service_description ? `<span class="tx-tag tag-svc">⚡ ${this._esc(t.service_description)}</span>` : ''}
+              ${tar ? `<span class="tx-tag tag-tar">💰 ${tar}</span>` : ''}
+            </div>
+            ${t.note ? `<div class="tx-note">💬 ${this._esc(t.note)}</div>` : ''}
+            <div class="tx-footer">
+              <span class="tx-status-badge ${st.cls}">${st.icon} ${st.label}</span>
+              <span class="tx-date">${this._formatDate(t.created_at)}</span>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+
+    // ── Ricariche Wallet ──
     if (recs.length) {
       html += '<div class="history-section-title">💳 Ricariche Wallet</div>';
-      html += recs.map(r=>`
-        <div class="history-card">
-          <div class="history-left">
-            <div class="history-kwh" style="color:#4CAF50">+ € ${parseFloat(r.importo_eur||0).toFixed(2)}</div>
-            <div class="history-desc">${this._esc(r.method||'Ricarica')}</div>
-            ${r.bonus_percent>0?`<div class="history-op">🎁 Bonus ${r.bonus_percent}%</div>`:''}
+      html += recs.map(r => {
+        const st = statusInfo[r.status] || {icon:'❓', label:r.status, cls:'s-pending'};
+        return `
+        <div class="history-card rec-card">
+          <div class="tx-status-bar s-confirmed"></div>
+          <div class="tx-body">
+            <div class="tx-top">
+              <div class="tx-kwh" style="color:#4CAF50">+ € ${parseFloat(r.importo_eur||0).toFixed(2)}</div>
+              <div class="tx-eur" style="color:#4CAF50">→ € ${parseFloat(r.total_credited||r.importo_eur||0).toFixed(2)}</div>
+            </div>
+            <div class="tx-details">
+              ${r.method ? `<span class="tx-tag tag-op">💳 ${this._esc(r.method)}</span>` : ''}
+              ${r.bonus_percent>0 ? `<span class="tx-tag tag-tar">🎁 Bonus +${r.bonus_percent}%</span>` : ''}
+            </div>
+            ${r.note ? `<div class="tx-note">💬 ${this._esc(r.note)}</div>` : ''}
+            <div class="tx-footer">
+              <span class="tx-status-badge ${st.cls}">${st.icon} ${st.label}</span>
+              <span class="tx-date">${this._formatDate(r.created_at)}</span>
+            </div>
           </div>
-          <div class="history-right">
-            <div class="history-eur" style="color:#4CAF50">€ ${parseFloat(r.total_credited||r.importo_eur||0).toFixed(2)}</div>
-            <div class="history-status">${statusMap[r.status]||r.status}</div>
-            <div class="history-date">${this._formatDate(r.created_at)}</div>
-          </div>
-        </div>`).join('');
+        </div>`;
+      }).join('');
     }
+
     list.innerHTML = html;
   },
 
@@ -413,70 +452,81 @@ const app = {
         </div>`;
     }
 
-    // ── Progress verso prossimo livello ──
+    // ── Livelli VIP Fox Fidelity con karma e cashback ──
+    const levels  = (d.all_levels||[]).filter(l=>l.karma_soglia!=null).sort((a,b)=>a.karma_soglia-b.karma_soglia);
+    const karma   = parseInt(d.trust_score||0);
+    // Trova livello corrente (massimo raggiunto)
+    let curIdx = -1;
+    levels.forEach((l,i)=>{ if(karma>=(parseInt(l.karma_soglia)||0)) curIdx=i; });
+    const nextLvl    = curIdx < levels.length-1 ? levels[curIdx+1] : null;
+    const curLvlData = curIdx>=0 ? levels[curIdx] : null;
+
+    // Progress bar verso prossimo livello
     let progressHtml = '';
-    const levels  = (d.all_levels||[]).sort((a,b)=>a.loyalty_level-b.loyalty_level);
-    const curIdx  = levels.findIndex(l=>Number(l.loyalty_level)===Number(d.loyalty_level));
-    const nextLvl = curIdx!==-1 && curIdx<levels.length-1 ? levels[curIdx+1] : null;
-    const kwhUsed = parseFloat(d.totals?.kwh_total||0);
-    if (nextLvl && levels.length>1) {
-      // Soglia per livello: 50 kWh per ogni step di livello
-      const soglia  = 50 * (curIdx+1);
-      const pct     = Math.min(100, Math.round((kwhUsed/soglia)*100));
-      const mancano = Math.max(0, (soglia-kwhUsed)).toFixed(1);
+    if (nextLvl) {
+      const soglia    = parseInt(nextLvl.karma_soglia);
+      const fromKarma = curLvlData ? parseInt(curLvlData.karma_soglia) : 0;
+      const pct       = Math.min(100, Math.round(((karma-fromKarma)/(soglia-fromKarma))*100));
+      const mancano   = Math.max(0, soglia - karma);
       progressHtml = `
         <div class="level-progress-card">
           <div class="level-progress-header">
-            <span class="level-cur">${this._esc(lvlName)}</span>
+            <span class="level-cur">${this._esc(curLvlData?.level_name||lvlName)}</span>
             <span class="level-arrow">→</span>
-            <span class="level-next">${this._esc(nextLvl.level_name||'Lv.'+nextLvl.loyalty_level)}</span>
+            <span class="level-next">${this._esc(nextLvl.level_name)}</span>
           </div>
           <div class="level-progress-bar-bg">
             <div class="level-progress-bar-fill" style="width:${pct}%"></div>
           </div>
           <div class="level-progress-info">
-            <span>${kwhUsed.toFixed(1)} kWh usati</span>
-            <span>${mancano} kWh al prossimo livello</span>
+            <span>🛡️ ${karma} karma</span>
+            <span>${mancano} karma al prossimo livello</span>
+          </div>
+        </div>`;
+    } else if (curLvlData) {
+      progressHtml = `
+        <div class="level-progress-card level-max">
+          <div style="text-align:center;padding:4px 0">
+            <div style="font-size:22px;margin-bottom:4px">🏆</div>
+            <div style="font-weight:900;font-size:15px">Livello Massimo!</div>
+            <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:4px">${this._esc(lvlName)} · ${karma} karma</div>
           </div>
         </div>`;
     }
 
-    // ── Cashback disponibili ──
-    let cashbackHtml = '';
-    const cbs = d.cashback_methods||[];
-    if (cbs.length) {
-      cashbackHtml = `
-        <div class="profile-section-title">💰 Cashback disponibili</div>
-        <div class="cashback-list">
-          ${cbs.map(c=>`
-            <div class="cashback-item">
-              <span class="cashback-icon">${c.icon||'💳'}</span>
-              <span class="cashback-label">${this._esc(c.label)}</span>
-              <span class="cashback-pct">+${parseFloat(c.bonus_percent).toFixed(0)}%</span>
-            </div>`).join('')}
-        </div>`;
-    }
-
-    // ── Tariffe attive ──
-    let tariffeHtml = '';
-    if (d.tariffe?.length) {
-      const dayMap = {1:'Lun',2:'Mar',3:'Mer',4:'Gio',5:'Ven',6:'Sab',7:'Dom'};
-      tariffeHtml = `
-        <div class="profile-section-title">⚡ Tariffe applicate</div>
-        <div class="profile-tariffe">
-          ${d.tariffe.map(t=>{
-            const days = (t.allowed_days||'1,2,3,4,5,6,7').split(',').map(d=>dayMap[d]||d).join(' ');
-            return `<div class="tariffa-card">
-              <div class="tariffa-price">€ ${parseFloat(t.tariffa_eur_kwh).toFixed(4)}<span>/kWh</span></div>
-              <div class="tariffa-info">
-                <div class="tariffa-desc">${this._esc(t.service_description)}</div>
-                <div class="tariffa-orario">${t.start_time?.slice(0,5)||'00:00'}–${t.end_time?.slice(0,5)||'23:59'} · ${days}</div>
-              </div>
+    // Tabella livelli Fox Fidelity
+    let fidelityHtml = '';
+    if (levels.length) {
+      fidelityHtml = `
+        <div class="profile-section-title">🦊 Fox Fidelity Program</div>
+        <div class="fidelity-table">
+          <div class="fidelity-header"><span>Livello</span><span>Karma</span><span>Cashback</span></div>
+          ${levels.map((l,i)=>{
+            const soglia  = parseInt(l.karma_soglia||0);
+            const reached = karma >= soglia;
+            const isCur   = i===curIdx;
+            return `<div class="fidelity-row ${isCur?'active':reached?'passed':''}">
+              <span class="fidelity-name">${isCur?'⭐':reached?'✅':'🔒'} ${this._esc(l.level_name)}</span>
+              <span class="fidelity-karma">${soglia.toLocaleString('it-IT')}</span>
+              <span class="fidelity-cb">${l.cashback ? '+'+l.cashback+'%' : '—'}</span>
             </div>`;
           }).join('')}
         </div>`;
     }
 
+    // Cashback attivo
+    let cashbackHtml = '';
+    if (curLvlData?.cashback) {
+      cashbackHtml = `
+        <div class="cashback-active-card">
+          <div class="cashback-active-icon">💰</div>
+          <div>
+            <div class="cashback-active-title">Cashback attivo</div>
+            <div class="cashback-active-pct">+${curLvlData.cashback}%</div>
+            <div class="cashback-active-desc">su ogni ricarica wallet</div>
+          </div>
+        </div>`;
+    }
     cont.innerHTML = `
       <div class="profile-header">
         <div class="profile-avatar ${isPremium?'premium':''}">${(d.first_name||'?')[0].toUpperCase()}</div>
@@ -522,6 +572,8 @@ const app = {
         </div>`:''}
       </div>
 
+      ${progressHtml}
+      ${fidelityHtml}
       ${cashbackHtml}
       ${tariffeHtml}
     `;

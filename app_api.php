@@ -183,37 +183,60 @@ try {
     }
 
     // =========================================================
-    // STORICO — transazioni + ricariche wallet
+    // STORICO — ultime 10 transactions + ultime 10 ricariche wallet
     // =========================================================
     if ($action === 'get_history') {
-        $limit = min((int)($_GET['limit'] ?? 15), 50);
-        $transactions = []; $recharges = [];
+        $transactions = [];
+        $recharges    = [];
+
+        // Ultime 10 dichiarazioni di consumo (transactions) con tutti i dati
         try {
             $s = db()->prepare("
-                SELECT t.id, t.kwh, t.importo_eur, t.status, t.created_at,
-                       t.operator_name, t.note,
-                       s.service_description, s.level_name,
-                       rs.slot_label
+                SELECT
+                    t.id,
+                    t.kwh,
+                    t.importo_eur,
+                    t.status,
+                    t.created_at,
+                    t.approved_at,
+                    t.rejected_at,
+                    t.pending_at,
+                    t.in_progress_at,
+                    t.updated_at,
+                    t.operator_name,
+                    t.note,
+                    s.service_description,
+                    s.level_name,
+                    s.tariffa_eur_kwh,
+                    s.service_type,
+                    rs.slot_label,
+                    rs.rfid_uid
                 FROM transactions t
-                LEFT JOIN services s ON t.servizio_id=s.id
-                LEFT JOIN rfid_slots rs ON t.rfid_slot_id=rs.id
-                WHERE t.user_id=?
-                ORDER BY t.created_at DESC LIMIT ?
+                LEFT JOIN services s  ON t.servizio_id  = s.id
+                LEFT JOIN rfid_slots rs ON t.rfid_slot_id = rs.id
+                WHERE t.user_id = ?
+                ORDER BY t.created_at DESC
+                LIMIT 10
             ");
-            $s->execute([$user['id'], $limit]);
+            $s->execute([$user['id']]);
             $transactions = $s->fetchAll(PDO::FETCH_ASSOC);
         } catch(Exception $e) {}
+
+        // Ultime 10 ricariche wallet
         try {
             $s = db()->prepare("
                 SELECT id, importo_eur, total_credited, bonus_percent,
                        status, method, created_at, note
-                FROM wallet_recharges WHERE user_id=?
-                ORDER BY created_at DESC LIMIT 10
+                FROM wallet_recharges
+                WHERE user_id = ?
+                ORDER BY created_at DESC
+                LIMIT 10
             ");
             $s->execute([$user['id']]);
             $recharges = $s->fetchAll(PDO::FETCH_ASSOC);
         } catch(Exception $e) {}
-        echo json_encode(['transactions'=>$transactions,'recharges'=>$recharges]);
+
+        echo json_encode(['transactions' => $transactions, 'recharges' => $recharges]);
         exit;
     }
 
@@ -265,9 +288,12 @@ try {
             }
         } catch(Exception $e) {}
 
-        // Tutti i livelli disponibili (per progress bar prossimo livello)
+        // Livelli VIP con soglie karma e cashback
+        // Le soglie karma sono in rfid_slots.min_trust_score (per slot VIP)
+        // oppure le leggiamo dal bot_settings se disponibile
         $all_levels = [];
         try {
+            // Leggi livelli distinti da services, con min karma approssimato
             $s = db()->query("
                 SELECT DISTINCT loyalty_level, level_name,
                        MIN(tariffa_eur_kwh) as tariffa_min
@@ -275,7 +301,44 @@ try {
                 GROUP BY loyalty_level, level_name
                 ORDER BY loyalty_level ASC
             ");
-            $all_levels = $s->fetchAll(PDO::FETCH_ASSOC);
+            $rows = $s->fetchAll(PDO::FETCH_ASSOC);
+
+            // Soglie karma e cashback dalla dashboard admin (bot_settings o hardcoded)
+            // Leggi da bot_settings se disponibile
+            $vip_settings = [];
+            try {
+                $bs = db()->query("SELECT setting_key, setting_value FROM bot_settings WHERE setting_key LIKE 'vip_%'");
+                foreach ($bs->fetchAll(PDO::FETCH_ASSOC) as $row) {
+                    $vip_settings[$row['setting_key']] = $row['setting_value'];
+                }
+            } catch(Exception $e) {}
+
+            // Mappa livelli con dati VIP dalla screenshot admin:
+            // SILVER VIRTUS: karma 500, 3% | GOLD FIDELIS: 2000, 10% | PLATINUM BOSS: 5000, 15%
+            $vip_map = [
+                'SILVER VIRTUS'  => ['karma_soglia'=>500,  'cashback'=>3],
+                'GOLD FIDELIS'   => ['karma_soglia'=>2000, 'cashback'=>10],
+                'PLATINUM BOSS'  => ['karma_soglia'=>5000, 'cashback'=>15],
+            ];
+
+            foreach ($rows as &$row) {
+                $ln = strtoupper(trim($row['level_name']));
+                // Cerca corrispondenza con i livelli VIP noti
+                foreach ($vip_map as $name => $data) {
+                    if (strpos($ln, str_replace(' ', '', $name)) !== false ||
+                        strpos(str_replace(' ', '', $ln), str_replace(' ', '', $name)) !== false ||
+                        $ln === $name) {
+                        $row['karma_soglia'] = $vip_settings['vip_karma_'.strtolower(str_replace(' ','_',$name))]
+                                               ?? $data['karma_soglia'];
+                        $row['cashback']     = $vip_settings['vip_cashback_'.strtolower(str_replace(' ','_',$name))]
+                                               ?? $data['cashback'];
+                        break;
+                    }
+                }
+                $row['karma_soglia'] = $row['karma_soglia'] ?? null;
+                $row['cashback']     = $row['cashback'] ?? null;
+                $all_levels[] = $row;
+            }
         } catch(Exception $e) {}
 
         // kWh totali confermati (usati per calcolo progresso livello)
@@ -303,17 +366,8 @@ try {
             if ($r) $totals['kwh_ricaricati'] = $r['kwh_ricaricati'];
         } catch(Exception $e) {}
 
-        // Cashback disponibili per metodo di pagamento
-        $cashback_methods = [];
-        try {
-            $s = db()->query("
-                SELECT label, bonus_percent, icon, style_color
-                FROM payment_methods
-                WHERE is_active=1 AND bonus_percent>0
-                ORDER BY bonus_percent DESC, display_order ASC
-            ");
-            $cashback_methods = $s->fetchAll(PDO::FETCH_ASSOC);
-        } catch(Exception $e) {}
+        // cashback_methods rimosso: il cashback è per livello VIP, non per metodo
+        $cashback_methods = []; // mantenuto per compatibilità
 
         // Info premium: giorni rimanenti
         $premium_days_left = null;
