@@ -968,6 +968,9 @@ input {
   font-weight: 600;
   opacity: 0.8;
 }
+.dash-balance-currency {
+  margin-right: 4px;
+}
 .dash-footer {
   display: flex;
   align-items: center;
@@ -1012,3 +1015,141 @@ input {
   opacity: 0.75;
   margin-left: 4px;
 }
+
+/* ==========================================
+   Premium card nel profilo
+   ========================================== */
+.premium-card {
+  background: linear-gradient(135deg, #C59115, #E5B942);
+  border-radius: 16px;
+  padding: 16px;
+  margin-bottom: 16px;
+  color: white;
+}
+.premium-card-top {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 10px;
+}
+.premium-star { font-size: 28px; flex-shrink: 0; }
+.premium-title { font-size: 11px; font-weight: 700; letter-spacing: 1px; opacity: 0.85; text-transform: uppercase; }
+.premium-level { font-size: 17px; font-weight: 900; }
+.premium-days {
+  margin-left: auto;
+  text-align: center;
+  background: rgba(0,0,0,0.15);
+  border-radius: 10px;
+  padding: 6px 12px;
+  flex-shrink: 0;
+}
+.premium-days-num { font-size: 22px; font-weight: 900; line-height: 1; }
+.premium-days-lbl { font-size: 10px; opacity: 0.8; }
+.premium-expiry   { font-size: 12px; opacity: 0.85; }
+.prem-expiry-warn   { color: #FFF3CD !important; }
+.prem-expiry-urgent { color: #FFCCCC !important; }
+.premium-days.prem-expiry-warn   { background: rgba(255,150,0,0.3); }
+.premium-days.prem-expiry-urgent { background: rgba(255,50,50,0.4); }
+
+/* Avatar premium con glow */
+.profile-avatar.premium {
+  background: linear-gradient(135deg, #C59115, #E5B942);
+  box-shadow: 0 4px 20px rgba(229,185,66,0.5);
+}
+
+/* Badge livello per utenti non-premium */
+.profile-level-badge {
+  text-align: center;
+  background: rgba(255,255,255,0.08);
+  border-radius: 20px;
+  padding: 6px 20px;
+  font-size: 13px;
+  font-weight: 700;
+  color: rgba(255,255,255,0.8);
+  margin: 0 auto 16px;
+  display: inline-block;
+  width: auto;
+}
+
+/* ==========================================
+   Progress verso prossimo livello
+   ========================================== */
+.level-progress-card {
+  background: var(--bg-card);
+  border-radius: 14px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+}
+.level-progress-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 10px;
+  font-size: 14px;
+}
+.level-cur  { font-weight: 700; color: var(--primary-orange); }
+.level-arrow{ color: var(--text-muted); }
+.level-next { font-weight: 700; color: rgba(255,255,255,0.6); }
+.level-progress-bar-bg {
+  height: 8px;
+  background: rgba(255,255,255,0.1);
+  border-radius: 4px;
+  overflow: hidden;
+  margin-bottom: 8px;
+}
+.level-progress-bar-fill {
+  height: 100%;
+  background: linear-gradient(90deg, var(--primary-orange-dark), var(--primary-orange));
+  border-radius: 4px;
+  transition: width 0.6s ease;
+}
+.level-progress-info {
+  display: flex;
+  justify-content: space-between;
+  font-size: 11px;
+  color: var(--text-muted);
+}
+
+/* ==========================================
+   Cashback
+   ========================================== */
+.cashback-list {
+  background: var(--bg-card);
+  border-radius: 14px;
+  padding: 4px 0;
+  margin-bottom: 16px;
+}
+.cashback-item {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(255,255,255,0.05);
+}
+.cashback-item:last-child { border-bottom: none; }
+.cashback-icon  { font-size: 20px; flex-shrink: 0; }
+.cashback-label { flex: 1; font-size: 14px; }
+.cashback-pct   {
+  font-size: 16px;
+  font-weight: 900;
+  color: #4CAF50;
+  background: rgba(76,175,80,0.12);
+  padding: 3px 10px;
+  border-radius: 20px;
+}
+
+/* ==========================================
+   Tariffe profilo (aggiornato)
+   ========================================== */
+.tariffa-card {
+  background: var(--bg-card);
+  border-radius: 12px;
+  padding: 12px 16px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+.tariffa-info { flex: 1; min-width: 0; }
+.tariffa-desc { font-size: 13px; font-weight: 600; }
+.tariffa-orario { font-size: 11px; color: var(--text-muted); margin-top: 2px; }

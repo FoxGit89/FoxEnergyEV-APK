@@ -240,12 +240,15 @@ try {
     }
 
     // =========================================================
-    // PROFILO — dati utente completi + tariffe + totali lifetime
+    // PROFILO — dati utente completi + loyalty + premium + cashback
     // =========================================================
     if ($action === 'get_profile') {
+        $lvl = (int)($user['loyalty_level'] ?? 0);
+
+        // Tariffe del livello corrente
         $tariffe = [];
+        $level_name = null;
         try {
-            $lvl = (int)($user['loyalty_level'] ?? 0);
             $s = db()->prepare("
                 SELECT level_name, service_description, tariffa_eur_kwh, start_time, end_time, allowed_days
                 FROM services WHERE loyalty_level=? AND active=1
@@ -253,9 +256,30 @@ try {
             ");
             $s->execute([$lvl]);
             $tariffe = $s->fetchAll(PDO::FETCH_ASSOC);
+            if (!empty($tariffe)) $level_name = $tariffe[0]['level_name'];
+            if (!$level_name) {
+                $ln = db()->prepare("SELECT level_name FROM services WHERE loyalty_level=? LIMIT 1");
+                $ln->execute([$lvl]);
+                $r = $ln->fetch(PDO::FETCH_ASSOC);
+                if ($r) $level_name = $r['level_name'];
+            }
         } catch(Exception $e) {}
 
-        $totals = ['kwh_total'=>0,'eur_total'=>0,'sessioni'=>0];
+        // Tutti i livelli disponibili (per progress bar prossimo livello)
+        $all_levels = [];
+        try {
+            $s = db()->query("
+                SELECT DISTINCT loyalty_level, level_name,
+                       MIN(tariffa_eur_kwh) as tariffa_min
+                FROM services WHERE active=1
+                GROUP BY loyalty_level, level_name
+                ORDER BY loyalty_level ASC
+            ");
+            $all_levels = $s->fetchAll(PDO::FETCH_ASSOC);
+        } catch(Exception $e) {}
+
+        // kWh totali confermati (usati per calcolo progresso livello)
+        $totals = ['kwh_total'=>0,'eur_total'=>0,'sessioni'=>0,'kwh_ricaricati'=>0];
         try {
             $s = db()->prepare("
                 SELECT COUNT(*) as sessioni,
@@ -265,24 +289,60 @@ try {
             ");
             $s->execute([$user['id']]);
             $r = $s->fetch(PDO::FETCH_ASSOC);
-            if ($r) $totals = $r;
+            if ($r) $totals = array_merge($totals, $r);
         } catch(Exception $e) {}
 
+        // kWh totali ricaricati nel wallet (per calcolo progresso)
+        try {
+            $s = db()->prepare("
+                SELECT COALESCE(SUM(total_credited), 0) as kwh_ricaricati
+                FROM wallet_recharges WHERE user_id=? AND status='CONFIRMED'
+            ");
+            $s->execute([$user['id']]);
+            $r = $s->fetch(PDO::FETCH_ASSOC);
+            if ($r) $totals['kwh_ricaricati'] = $r['kwh_ricaricati'];
+        } catch(Exception $e) {}
+
+        // Cashback disponibili per metodo di pagamento
+        $cashback_methods = [];
+        try {
+            $s = db()->query("
+                SELECT label, bonus_percent, icon, style_color
+                FROM payment_methods
+                WHERE is_active=1 AND bonus_percent>0
+                ORDER BY bonus_percent DESC, display_order ASC
+            ");
+            $cashback_methods = $s->fetchAll(PDO::FETCH_ASSOC);
+        } catch(Exception $e) {}
+
+        // Info premium: giorni rimanenti
+        $premium_days_left = null;
+        if ($user['is_premium'] && $user['premium_expires_at']) {
+            $exp = new DateTime($user['premium_expires_at']);
+            $now = new DateTime();
+            $diff = $now->diff($exp);
+            $premium_days_left = $diff->invert ? 0 : $diff->days;
+        }
+
         echo json_encode([
-            'telegram_id'     => $user['telegram_id'],
-            'username'        => $user['username'] ?? '',
-            'first_name'      => $user['first_name'] ?? '',
-            'last_name'       => $user['last_name'] ?? '',
-            'status'          => $user['status'] ?? 'active',
-            'saldo_kwh'       => $user['saldo_kwh'] ?? 0,
-            'trust_score'     => $user['trust_score'] ?? 0,
-            'loyalty_level'   => $user['loyalty_level'] ?? 0,
-            'is_premium'      => $user['is_premium'] ?? 0,
-            'premium_expires' => $user['premium_expires_at'] ?? null,
-            'can_overdraft'   => $user['can_overdraft'] ?? 0,
-            'member_since'    => $user['created_at'] ?? '',
-            'tariffe'         => $tariffe,
-            'totals'          => $totals,
+            'telegram_id'       => $user['telegram_id'],
+            'username'          => $user['username'] ?? '',
+            'first_name'        => $user['first_name'] ?? '',
+            'last_name'         => $user['last_name'] ?? '',
+            'status'            => $user['status'] ?? 'active',
+            'saldo_kwh'         => $user['saldo_kwh'] ?? 0,
+            'trust_score'       => $user['trust_score'] ?? 0,
+            'loyalty_level'     => $lvl,
+            'level_name'        => $level_name ?? 'Standard',
+            'is_premium'        => $user['is_premium'] ?? 0,
+            'premium_expires'   => $user['premium_expires_at'] ?? null,
+            'premium_days_left' => $premium_days_left,
+            'can_overdraft'     => $user['can_overdraft'] ?? 0,
+            'member_since'      => $user['created_at'] ?? '',
+            'tariffe'           => $tariffe,
+            'all_levels'        => $all_levels,
+            'totals'            => $totals,
+            'cashback_methods'  => $cashback_methods,
         ]);
         exit;
     }

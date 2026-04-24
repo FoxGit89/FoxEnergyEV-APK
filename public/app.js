@@ -351,33 +351,117 @@ const app = {
   },
 
   _renderProfile(cont, d) {
-    const lvlNames = {0:'Standard',1:'Silver',2:'Gold',3:'Platinum',4:'Diamond'};
-    const lvlName  = lvlNames[d.loyalty_level]||`Lv.${d.loyalty_level}`;
-    const since    = d.member_since ? new Date(d.member_since).toLocaleDateString('it-IT',{month:'long',year:'numeric'}) : '';
-    const premExp  = d.premium_expires ? new Date(d.premium_expires).toLocaleDateString('it-IT') : '';
-    const dayNames = ['','Lun','Mar','Mer','Gio','Ven','Sab','Dom'];
+    const lvlName   = d.level_name || 'Standard';
+    const isPremium = !!d.is_premium;
+    const since = d.member_since
+      ? new Date(d.member_since).toLocaleDateString('it-IT',{month:'long',year:'numeric'}) : '';
+    const saldo = parseFloat(d.saldo_kwh||0).toFixed(2);
+
+    // ── Giorni premium rimanenti ──
+    let premiumHtml = '';
+    if (isPremium && d.premium_expires) {
+      const exp  = new Date(d.premium_expires);
+      const days = d.premium_days_left ?? Math.max(0, Math.round((exp-Date.now())/86400000));
+      const expStr = exp.toLocaleDateString('it-IT',{day:'2-digit',month:'long',year:'numeric'});
+      const urgClass = days<=7 ? 'prem-expiry-urgent' : days<=30 ? 'prem-expiry-warn' : '';
+      premiumHtml = `
+        <div class="premium-card">
+          <div class="premium-card-top">
+            <div class="premium-star">⭐</div>
+            <div>
+              <div class="premium-title">FOX PREMIUM ATTIVO</div>
+              <div class="premium-level">${this._esc(lvlName)}</div>
+            </div>
+            <div class="premium-days ${urgClass}">
+              <div class="premium-days-num">${days}</div>
+              <div class="premium-days-lbl">giorni</div>
+            </div>
+          </div>
+          <div class="premium-expiry ${urgClass}">
+            ${days<=7?'⚠️ ':''}Scade il ${expStr}
+          </div>
+        </div>`;
+    }
+
+    // ── Progress verso prossimo livello ──
+    let progressHtml = '';
+    const levels  = (d.all_levels||[]).sort((a,b)=>a.loyalty_level-b.loyalty_level);
+    const curIdx  = levels.findIndex(l=>Number(l.loyalty_level)===Number(d.loyalty_level));
+    const nextLvl = curIdx!==-1 && curIdx<levels.length-1 ? levels[curIdx+1] : null;
+    const kwhUsed = parseFloat(d.totals?.kwh_total||0);
+    if (nextLvl && levels.length>1) {
+      // Soglia per livello: 50 kWh per ogni step di livello
+      const soglia  = 50 * (curIdx+1);
+      const pct     = Math.min(100, Math.round((kwhUsed/soglia)*100));
+      const mancano = Math.max(0, (soglia-kwhUsed)).toFixed(1);
+      progressHtml = `
+        <div class="level-progress-card">
+          <div class="level-progress-header">
+            <span class="level-cur">${this._esc(lvlName)}</span>
+            <span class="level-arrow">→</span>
+            <span class="level-next">${this._esc(nextLvl.level_name||'Lv.'+nextLvl.loyalty_level)}</span>
+          </div>
+          <div class="level-progress-bar-bg">
+            <div class="level-progress-bar-fill" style="width:${pct}%"></div>
+          </div>
+          <div class="level-progress-info">
+            <span>${kwhUsed.toFixed(1)} kWh usati</span>
+            <span>${mancano} kWh al prossimo livello</span>
+          </div>
+        </div>`;
+    }
+
+    // ── Cashback disponibili ──
+    let cashbackHtml = '';
+    const cbs = d.cashback_methods||[];
+    if (cbs.length) {
+      cashbackHtml = `
+        <div class="profile-section-title">💰 Cashback disponibili</div>
+        <div class="cashback-list">
+          ${cbs.map(c=>`
+            <div class="cashback-item">
+              <span class="cashback-icon">${c.icon||'💳'}</span>
+              <span class="cashback-label">${this._esc(c.label)}</span>
+              <span class="cashback-pct">+${parseFloat(c.bonus_percent).toFixed(0)}%</span>
+            </div>`).join('')}
+        </div>`;
+    }
+
+    // ── Tariffe attive ──
+    let tariffeHtml = '';
+    if (d.tariffe?.length) {
+      const dayMap = {1:'Lun',2:'Mar',3:'Mer',4:'Gio',5:'Ven',6:'Sab',7:'Dom'};
+      tariffeHtml = `
+        <div class="profile-section-title">⚡ Tariffe applicate</div>
+        <div class="profile-tariffe">
+          ${d.tariffe.map(t=>{
+            const days = (t.allowed_days||'1,2,3,4,5,6,7').split(',').map(d=>dayMap[d]||d).join(' ');
+            return `<div class="tariffa-card">
+              <div class="tariffa-price">€ ${parseFloat(t.tariffa_eur_kwh).toFixed(4)}<span>/kWh</span></div>
+              <div class="tariffa-info">
+                <div class="tariffa-desc">${this._esc(t.service_description)}</div>
+                <div class="tariffa-orario">${t.start_time?.slice(0,5)||'00:00'}–${t.end_time?.slice(0,5)||'23:59'} · ${days}</div>
+              </div>
+            </div>`;
+          }).join('')}
+        </div>`;
+    }
+
     cont.innerHTML = `
-      <!-- Intestazione profilo -->
       <div class="profile-header">
-        <div class="profile-avatar">${(d.first_name||'?')[0].toUpperCase()}</div>
+        <div class="profile-avatar ${isPremium?'premium':''}">${(d.first_name||'?')[0].toUpperCase()}</div>
         <div class="profile-name">${this._esc(d.first_name)} ${this._esc(d.last_name||'')}</div>
-        <div class="profile-username">${d.username?'@'+this._esc(d.username):''}</div>
+        ${d.username?`<div class="profile-username">@${this._esc(d.username)}</div>`:''}
         ${since?`<div class="profile-since">Membro da ${since}</div>`:''}
       </div>
 
-      <!-- Badge stato -->
-      <div class="profile-badges">
-        ${d.is_premium?`<span class="badge-premium">⭐ PREMIUM</span>`:''}
-        <span class="badge-level">${lvlName}</span>
-        ${d.can_overdraft?`<span class="badge-overdraft">💎 Overdraft</span>`:''}
-        ${premExp?`<span class="badge-info">Scade: ${premExp}</span>`:''}
-      </div>
+      ${premiumHtml}
+      ${!isPremium?`<div class="profile-level-badge">${this._esc(lvlName)}</div>`:''}
 
-      <!-- Saldo e karma -->
       <div class="profile-stats-row">
         <div class="profile-stat">
-          <div class="profile-stat-val">${parseFloat(d.saldo_kwh||0).toFixed(2)}</div>
-          <div class="profile-stat-lbl">kWh saldo</div>
+          <div class="profile-stat-val">€ ${saldo}</div>
+          <div class="profile-stat-lbl">Saldo wallet</div>
         </div>
         <div class="profile-stat">
           <div class="profile-stat-val">${d.trust_score||0}</div>
@@ -389,24 +473,27 @@ const app = {
         </div>
       </div>
 
-      <!-- Totali lifetime -->
+      ${progressHtml}
+
       <div class="profile-section-title">📊 Totale lifetime</div>
       <div class="profile-lifetime">
-        <div class="lifetime-item"><span class="lifetime-lbl">Energia ricaricata</span><span class="lifetime-val">${parseFloat(d.totals?.kwh_total||0).toFixed(2)} kWh</span></div>
-        <div class="lifetime-item"><span class="lifetime-lbl">Importo totale</span><span class="lifetime-val">€ ${parseFloat(d.totals?.eur_total||0).toFixed(2)}</span></div>
+        <div class="lifetime-item">
+          <span class="lifetime-lbl">Energia usata</span>
+          <span class="lifetime-val">${parseFloat(d.totals?.kwh_total||0).toFixed(2)} kWh</span>
+        </div>
+        <div class="lifetime-item">
+          <span class="lifetime-lbl">Importo totale</span>
+          <span class="lifetime-val">€ ${parseFloat(d.totals?.eur_total||0).toFixed(2)}</span>
+        </div>
+        ${parseFloat(d.totals?.kwh_ricaricati||0)>0?`
+        <div class="lifetime-item">
+          <span class="lifetime-lbl">Wallet ricaricato</span>
+          <span class="lifetime-val">€ ${parseFloat(d.totals.kwh_ricaricati).toFixed(2)}</span>
+        </div>`:''}
       </div>
 
-      <!-- Tariffe attive -->
-      ${d.tariffe?.length ? `
-      <div class="profile-section-title">💰 Tariffe applicate</div>
-      <div class="profile-tariffe">
-        ${d.tariffe.map(t=>`
-          <div class="tariffa-card">
-            <div class="tariffa-price">€ ${parseFloat(t.tariffa_eur_kwh).toFixed(4)}<span>/kWh</span></div>
-            <div class="tariffa-desc">${this._esc(t.service_description||t.level_name)}</div>
-            <div class="tariffa-orario">${t.start_time?.slice(0,5)||'00:00'} – ${t.end_time?.slice(0,5)||'23:59'}</div>
-          </div>`).join('')}
-      </div>` : ''}
+      ${cashbackHtml}
+      ${tariffeHtml}
     `;
   },
 
