@@ -927,3 +927,88 @@ input {
 .slot-status-row.empty  { opacity:0.4; }
 .slot-status-num { width:28px;height:28px;border-radius:50%;background:rgba(255,152,0,0.15);color:var(--primary-orange);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;flex-shrink:0; }
 .slot-status-row.empty .slot-status-num { background:rgba(255,255,255,0.08);color:var(--text-muted); }
+
+/* ==========================================
+   Dashboard card v30 — layout fluido
+   ========================================== */
+.dash-level-badge {
+  display: inline-flex;
+  align-items: center;
+  background: rgba(255,255,255,0.15);
+  backdrop-filter: blur(4px);
+  border-radius: 20px;
+  padding: 4px 14px;
+  font-size: 12px;
+  font-weight: 700;
+  letter-spacing: 0.5px;
+  color: white;
+}
+.dashboard-card.premium .dash-level-badge {
+  background: rgba(255,255,255,0.2);
+}
+.dash-balance-wrap {
+  padding: 10px 0 6px;
+}
+.dash-balance-label {
+  font-size: 11px;
+  font-weight: 600;
+  color: rgba(255,255,255,0.65);
+  letter-spacing: 1px;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.dash-balance {
+  font-size: 48px;
+  font-weight: 900;
+  line-height: 1;
+  letter-spacing: -1px;
+}
+.dash-balance-unit {
+  font-size: 22px;
+  font-weight: 600;
+  opacity: 0.8;
+}
+.dash-footer {
+  display: flex;
+  align-items: center;
+  gap: 0;
+}
+.dash-karma-wrap {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-shrink: 0;
+  padding-right: 16px;
+  border-right: 1px solid rgba(255,255,255,0.2);
+  margin-right: 16px;
+}
+.dash-karma-icon { font-size: 20px; }
+.dash-karma-val  { font-size: 20px; font-weight: 900; line-height: 1; }
+.dash-karma-lbl  { font-size: 10px; color: rgba(255,255,255,0.65); margin-top: 1px; }
+.dash-tariff-wrap { flex: 1; min-width: 0; }
+.dash-tariff-lbl  { font-size: 10px; color: rgba(255,255,255,0.65); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
+.dash-tariff-val  { display: flex; flex-wrap: wrap; gap: 4px; }
+
+/* Tariffe come chip */
+.tariff-chip {
+  display: inline-flex;
+  align-items: baseline;
+  gap: 3px;
+  background: rgba(255,255,255,0.15);
+  border-radius: 8px;
+  padding: 2px 8px;
+  font-size: 13px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.tariff-chip small { font-size: 10px; font-weight: 400; opacity: 0.8; }
+.tariff-price {
+  font-size: 15px;
+  font-weight: 900;
+}
+.tariff-price small { font-size: 10px; font-weight: 400; opacity: 0.8; margin-left: 1px; }
+.tariff-desc {
+  font-size: 10px;
+  opacity: 0.75;
+  margin-left: 4px;
+}

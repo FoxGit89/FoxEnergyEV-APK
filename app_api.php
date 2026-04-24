@@ -64,25 +64,34 @@ try {
     if ($action === 'get_dashboard') {
         $stats = getUserMonthlyStats($user_id);
 
-        // Tariffa attiva per l'utente (giorno, ora, livello loyalty)
-        $tariffa = null;
+        // Tutte le tariffe attive per l'utente (giorno e ora correnti)
+        $tariffe_attive = [];
+        $level_name = null;
         try {
             $dow  = (int)date('N');
             $ora  = date('H:i:s');
             $oggi = date('Y-m-d');
             $lvl  = (int)($user['loyalty_level'] ?? 0);
             $ts = db()->prepare("
-                SELECT level_name, service_description, tariffa_eur_kwh
+                SELECT level_name, service_description, tariffa_eur_kwh, start_time, end_time
                 FROM services
                 WHERE loyalty_level=? AND active=1
                   AND FIND_IN_SET(?,allowed_days)>0
                   AND start_time<=? AND end_time>=?
                   AND (start_date IS NULL OR start_date<=?)
                   AND (end_date IS NULL OR end_date>=?)
-                ORDER BY tariffa_eur_kwh ASC LIMIT 1
+                ORDER BY tariffa_eur_kwh ASC
             ");
             $ts->execute([$lvl,$dow,$ora,$ora,$oggi,$oggi]);
-            $tariffa = $ts->fetch(PDO::FETCH_ASSOC);
+            $tariffe_attive = $ts->fetchAll(PDO::FETCH_ASSOC);
+            if (!empty($tariffe_attive)) $level_name = $tariffe_attive[0]['level_name'];
+            // Fallback: prendi level_name anche se fuori orario
+            if (!$level_name) {
+                $ln = db()->prepare("SELECT level_name FROM services WHERE loyalty_level=? AND active=1 LIMIT 1");
+                $ln->execute([$lvl]);
+                $r = $ln->fetch(PDO::FETCH_ASSOC);
+                if ($r) $level_name = $r['level_name'];
+            }
         } catch(Exception $e) {}
 
         // Conteggio broadcast ultimi 7 giorni
@@ -104,10 +113,11 @@ try {
             'is_premium'        => $user['is_premium'] ?? 0,
             'premium_expires'   => $user['premium_expires_at'] ?? null,
             'loyalty_level'     => $user['loyalty_level'] ?? 0,
+            'level_name'        => $level_name ?? null,
             'status'            => $user['status'] ?? 'active',
             'can_overdraft'     => $user['can_overdraft'] ?? 0,
             'monthly_stats'     => $stats,
-            'tariffa'           => $tariffa,
+            'tariffe_attive'    => $tariffe_attive,
             'unread_broadcasts' => $unread_bc,
         ]);
         exit;

@@ -133,18 +133,22 @@ const app = {
     document.getElementById('dash-card').className = 'dashboard-card'+(isPrem?' premium':'')+(isLow?' low-balance':'');
     const w=document.getElementById('dash-warning'); if(isLow)w.classList.remove('hidden'); else w.classList.add('hidden');
 
-    // Badge premium / livello
-    const lvlNames = {0:'Standard',1:'Silver',2:'Gold',3:'Platinum',4:'Diamond'};
-    const lvlName  = lvlNames[d.loyalty_level] || `Lv.${d.loyalty_level}`;
+    // Badge premium / livello — usa level_name dal DB
+    const lvlName  = d.level_name || (d.loyalty_level ? `Lv.${d.loyalty_level}` : 'Standard');
     const premBadge = document.getElementById('dash-premium-badge');
-    if (premBadge) premBadge.textContent = isPrem ? `⭐ FOX PREMIUM — ${lvlName}` : `${lvlName}`;
+    if (premBadge) premBadge.textContent = isPrem ? `⭐ FOX PREMIUM — ${lvlName}` : lvlName;
 
-    // Tariffa attiva
+    // Tariffe attive (possono essere multiple)
     const tariffEl = document.getElementById('dash-tariff-val');
     if (tariffEl) {
-      if (d.tariffa) {
-        tariffEl.textContent = `€ ${parseFloat(d.tariffa.tariffa_eur_kwh).toFixed(4)}/kWh`;
-        tariffEl.title = d.tariffa.service_description || '';
+      const ts = d.tariffe_attive||[];
+      if (ts.length===1) {
+        tariffEl.innerHTML = `<span class="tariff-price">€ ${parseFloat(ts[0].tariffa_eur_kwh).toFixed(4)}<small>/kWh</small></span>
+          <span class="tariff-desc">${ts[0].service_description||''}</span>`;
+      } else if (ts.length>1) {
+        tariffEl.innerHTML = ts.map(t=>
+          `<span class="tariff-chip">€ ${parseFloat(t.tariffa_eur_kwh).toFixed(4)} <small>${t.service_description||''}</small></span>`
+        ).join('');
       } else {
         tariffEl.textContent = 'N/D';
       }
