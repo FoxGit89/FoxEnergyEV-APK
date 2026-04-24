@@ -138,17 +138,24 @@ const app = {
   },
 
   renderSlots() {
-    const list=document.getElementById('slot-list'); list.innerHTML=''; let canSync=false;
-    for (let i=1;i<=8;i++) {
-      const card=this.mapping[i]; if(card)canSync=true;
-      const div=document.createElement('div');
-      div.className=`slot-card ${card?'active':''}`;
-      div.onclick=()=>this.openSlotPicker(i);
-      div.innerHTML=`<div class="slot-num">${i}</div><div class="slot-title">${card?card.slot_label:'Nessun dato assegnato'}</div><div class="slot-icon">📝</div>`;
-      list.appendChild(div);
-    }
-    const btn=document.getElementById('start-sync-btn');
-    btn.disabled=!canSync; if(canSync)btn.classList.add('active'); else btn.classList.remove('active');
+    let canSync=false;
+    const makeCards=(listId)=>{
+      const list=document.getElementById(listId); if(!list)return;
+      list.innerHTML='';
+      for (let i=1;i<=8;i++) {
+        const card=this.mapping[i]; if(card)canSync=true;
+        const div=document.createElement('div');
+        div.className=`slot-card ${card?'active':''}`;
+        div.onclick=()=>this.openSlotPicker(i);
+        div.innerHTML=`<div class="slot-num">${i}</div><div class="slot-title">${card?card.slot_label:'Nessun dato assegnato'}</div><div class="slot-icon">📝</div>`;
+        list.appendChild(div);
+      }
+    };
+    makeCards('slot-list');         // dashboard
+    makeCards('connect-slot-list'); // connect-screen
+    // Mostra/nascondi pulsante sincronizza nella connect-screen
+    const syncBtn=document.getElementById('connect-proceed-btn');
+    if (syncBtn) { if(canSync)syncBtn.classList.remove('hidden'); else syncBtn.classList.add('hidden'); }
   },
 
   openSlotPicker(slotNum) {
