@@ -390,6 +390,7 @@ window.bleEngine = {
 
       // Connessione — pattern identico v10
       if (this.ultra) { try{await this.ultra.disconnect();}catch(e){} this.ultra=null; }
+      // Timeout 30s per operazioni BLE intensive (default 5s è troppo poco per 8 slot 4K)
       this.ultra = new ChameleonUltra();
       await this.ultra.use(new window.ChameleonUltraJS.WebbleAdapter());
       await this.ultra.connect();
@@ -401,10 +402,10 @@ window.bleEngine = {
         await this.ultra.cmdSlotResetTagType(i, TagType.MIFARE_1024);
         await this.ultra.cmdSlotSetEnable(i, FreqType.HF, false);
         await this.ultra.cmdSlotDeleteFreqName(i, FreqType.HF).catch(()=>{});
-        await new Promise(r=>setTimeout(r,30));
+        await new Promise(r=>setTimeout(r,50));
       }
       await this.ultra.cmdSlotSaveSettings();
-      await new Promise(r=>setTimeout(r,100));
+      await new Promise(r=>setTimeout(r,200));
       await this.ultra.cmdChangeDeviceMode(DeviceMode.TAG);
 
       // Reset mapping locale
@@ -443,10 +444,10 @@ window.bleEngine = {
         await this.ultra.cmdSlotResetTagType(i,TagType.MIFARE_1024);
         await this.ultra.cmdSlotSetEnable(i,FreqType.HF,false);
         await this.ultra.cmdSlotDeleteFreqName(i,FreqType.HF).catch(()=>{});
-        await new Promise(r=>setTimeout(r,30));
+        await new Promise(r=>setTimeout(r,50));
       }
       await this.ultra.cmdSlotSaveSettings();
-      await new Promise(r=>setTimeout(r,100));
+      await new Promise(r=>setTimeout(r,200));
 
       const total=slotsToWrite.length;
       const loadedLabels=[];
@@ -473,7 +474,20 @@ window.bleEngine = {
         this.updateUI(base+(80/total)*0.5,`[${idx+1}/${total}] Scrittura ${profile.numBlocks} blocchi...`,'working');
         for (let block=0;block<profile.numBlocks;block++) {
           const chunk=profile.body.slice(block*16,(block+1)*16);
-          await this.ultra.cmdMf1EmuWriteBlock(block,chunk);
+          // Retry automatico in caso di timeout BLE
+          for (let attempt=0; attempt<3; attempt++) {
+            try {
+              await this.ultra.cmdMf1EmuWriteBlock(block,chunk);
+              break;
+            } catch(e) {
+              if (attempt===2) throw e; // fallisce dopo 3 tentativi
+              await new Promise(r=>setTimeout(r,300)); // pausa prima di retry
+            }
+          }
+          // Pausa ogni 16 blocchi per dare respiro al BLE
+          if (block>0 && block%16===0) {
+            await new Promise(r=>setTimeout(r,80));
+          }
           if (block%8===0||block===profile.numBlocks-1) {
             const wp=base+(80/total)*0.5+(80/total)*0.45*(block/profile.numBlocks);
             this.updateUI(wp,`[${idx+1}/${total}] Blocco ${block+1}/${profile.numBlocks}...`,'working');
@@ -481,7 +495,7 @@ window.bleEngine = {
         }
         loadedLabels.push(card.slot_label);
         this.updateUI(base+(80/total)*0.98,`Slot ${slotIdx+1} scritto ✓`,'working');
-        await new Promise(r=>setTimeout(r,80));
+        await new Promise(r=>setTimeout(r,150));
       }
 
       this.updateUI(92,'💾 Salvataggio...','working');
