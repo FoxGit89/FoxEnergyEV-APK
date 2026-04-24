@@ -107,7 +107,7 @@ const app = {
 
   async loadDashboard() {
     this.showScreen('auth-gate');
-    document.getElementById('dash-header-title').textContent = `CALISYNC • ${this.user.firstName}`;
+    document.getElementById('dash-header-title').textContent = `🦊 CaliSync • ${this.user.firstName}`;
     try {
       const dashData  = await this.apiCall({ action:'get_dashboard', user_id:this.user.telegramId });
       const cardsData = await this.apiCall({ action:'get_slots',     user_id:this.user.telegramId });
@@ -737,11 +737,11 @@ const secureSession = {
       document.getElementById('wipe-title').textContent=title;
       document.getElementById('wipe-status').textContent=status;
     };
-    setWipe('🗑️','CANCELLAZIONE IN CORSO',reason==='auto'?'Timer scaduto — pulizia slot...':'Cancellazione manuale...');
+    setWipe('🦊🗑️','CANCELLAZIONE IN CORSO',reason==='auto'?'Timer scaduto — pulizia slot...':'Cancellazione manuale...');
     try {
       await bleEngine.wipeAllSlots(setWipe);
       if(navigator.vibrate)navigator.vibrate([100,50,200]);
-      setWipe('✅','DISPOSITIVO PULITO','Tutti gli slot sono stati cancellati con successo.');
+      setWipe('🦊✅','DISPOSITIVO PULITO','Tutti gli slot sono stati cancellati. Arrivederci!');
       setTimeout(()=>{this._wiping=false;app.showScreen('dashboard-screen');},2000);
     } catch(err) {
       console.error('[WIPE ERROR]',err);

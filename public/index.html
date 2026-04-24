@@ -3,10 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-  <title>CaliSync by Fox Energy EV</title>
+  <title>🦊 CaliSync — Fox Energy EV</title>
   <meta name="theme-color" content="#FF9800">
-  <link rel="manifest" href="manifest.json?v=35">
-  <link rel="stylesheet" href="style.css?v=35">
+  <link rel="manifest" href="manifest.json?v=36">
+  <link rel="stylesheet" href="style.css?v=36">
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/index.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/Crypto1.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/plugin/WebbleAdapter.global.js"></script>
@@ -17,7 +17,7 @@
   <div id="auth-gate" class="screen">
     <div class="spinner"></div>
     <div id="auth-denied-content" class="hidden">
-      <div style="font-size:80px;color:white">🚫</div>
+      <div style="font-size:80px;color:white">🦊🚫</div>
       <h1 style="color:white;margin:20px 0">ACCESSO NEGATO</h1>
       <p style="color:rgba(255,255,255,0.7);font-size:16px;margin-bottom:40px">La tua licenza CALISYNC è scaduta o sospesa.<br><br>Contatta Fox Energy per regolarizzarla.</p>
       <button class="btn-secondary" style="background:white;color:#B71C1C" onclick="app.logout()">CAMBIA ACCOUNT</button>
@@ -28,8 +28,8 @@
   <div id="login-screen" class="screen hidden">
     <div class="container" style="max-width:400px;display:flex;flex-direction:column;justify-content:center;height:100%">
       <div class="login-header">
-        <div class="login-icon-wrap">⚡</div>
-        <h1 style="font-size:26px;font-weight:900;letter-spacing:2px">FOX ENERGY EV<br>CALISYNC</h1>
+        <div class="login-icon-wrap">🦊</div>
+        <h1 style="font-size:26px;font-weight:900;letter-spacing:2px">🦊 FOX ENERGY EV<br>CALISYNC</h1>
         <p style="color:var(--text-muted);letter-spacing:1.5px;font-size:12px;margin-top:10px">Terminal Management System</p>
       </div>
       <div class="input-group">
@@ -89,17 +89,17 @@
         <div class="how-to-carousel" id="how-to-carousel">
           <div class="how-to-slide">
             <div class="slide-num">1</div>
-            <div class="slide-title">Collega il Chameleon</div>
+            <div class="slide-title">🦊 Collega il Chameleon</div>
             <div class="slide-desc">Premi il pulsante. Il dispositivo viene pulito e puoi scegliere le tessere da caricare.</div>
           </div>
           <div class="how-to-slide">
             <div class="slide-num">2</div>
-            <div class="slide-title">Seleziona e sincronizza</div>
+            <div class="slide-title">🦊 Seleziona e sincronizza</div>
             <div class="slide-desc">Assegna le tessere RFID agli slot e avvia la sincronizzazione.</div>
           </div>
           <div class="how-to-slide">
             <div class="slide-num">3</div>
-            <div class="slide-title">Usa — hai 60 secondi</div>
+            <div class="slide-title">🦊 Usa — hai 60 secondi</div>
             <div class="slide-desc">Avvicinati alla colonnina. Alla scadenza gli slot vengono cancellati in automatico.</div>
           </div>
           <div class="how-to-slide warn">
@@ -120,7 +120,7 @@
     <!-- Sync bar + tab bar unificate -->
     <div class="bottom-bar">
       <button class="btn-primary btn-connect-main" onclick="app.startConnectFlow()">
-        🔗 COLLEGA CHAMELEON ULTRA
+        🦊 COLLEGA CHAMELEON ULTRA
       </button>
       <div class="tab-bar">
         <button class="tab-btn" onclick="app.showHistory()">
@@ -167,7 +167,7 @@
   <div id="connect-screen" class="screen hidden">
     <div class="app-header">
       <button class="header-back" onclick="app.showScreen('dashboard-screen')">◀</button>
-      Connessione Chameleon
+      🦊 Connessione Chameleon
     </div>
     <div class="container" style="display:flex;flex-direction:column;align-items:center;text-align:center;padding-top:40px">
 
@@ -192,7 +192,7 @@
 
   <!-- Screen 5: Sync in corso -->
   <div id="sync-screen" class="screen hidden">
-    <div class="app-header">Gestione Terminale</div>
+    <div class="app-header">🦊 Gestione Terminale</div>
     <div class="container" style="display:flex;flex-direction:column;justify-content:center;height:calc(100vh - 60px)">
       <div id="sync-icon" class="sync-status-icon working">📶</div>
       <div class="progress-container">
@@ -208,7 +208,7 @@
 
   <!-- Screen 6: Sessione attiva (countdown 60s) -->
   <div id="session-screen" class="screen hidden">
-    <div class="app-header"><span>⚡ Sessione Attiva</span></div>
+    <div class="app-header"><span>🦊⚡ Sessione Attiva</span></div>
     <div class="container" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:calc(100vh - 60px);text-align:center;padding:30px">
 
       <div class="session-ring-wrap">
@@ -312,6 +312,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=35"></script>
+  <script src="app.js?v=36"></script>
 </body>
 </html>
