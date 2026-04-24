@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>CaliSync by Fox Energy EV</title>
   <meta name="theme-color" content="#FF9800">
-  <link rel="manifest" href="manifest.json?v=29">
-  <link rel="stylesheet" href="style.css?v=29">
+  <link rel="manifest" href="manifest.json?v=30">
+  <link rel="stylesheet" href="style.css?v=30">
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/index.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/Crypto1.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/plugin/WebbleAdapter.global.js"></script>
@@ -71,11 +71,27 @@
         <div class="dash-divider"></div>
         <div class="dash-bottom">
           <div class="dash-bottom-item">🛡️ Karma: <span id="dash-karma-val">0</span></div>
-          <div class="dash-bottom-item" style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">⚡ Tariffa: <span id="dash-tariff-val">Standard</span></div>
+          <div class="dash-bottom-item" style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">⚡ <span id="dash-tariff-val">—</span></div>
         </div>
+        <div id="dash-premium-expires" class="dash-premium-expires hidden"></div>
       </div>
     </div>
-    <!-- Pulsante unico grande centrato -->
+    <!-- Action bar dashboard -->
+    <div class="dash-action-bar">
+      <button class="dash-action-btn" onclick="app.showHistory()">
+        <span class="dash-action-icon">📋</span>
+        <span>Storico</span>
+      </button>
+      <button class="dash-action-btn" onclick="app.showBroadcasts()">
+        <span class="dash-action-icon">📢</span>
+        <span>Messaggi</span>
+        <span id="broadcasts-badge" class="action-badge hidden">0</span>
+      </button>
+      <button class="dash-action-btn" onclick="app.showProfile()">
+        <span class="dash-action-icon">👤</span>
+        <span>Profilo</span>
+      </button>
+    </div>
     <div class="sync-bar">
       <button class="btn-primary btn-connect-main" onclick="app.startConnectFlow()">
         🔗 COLLEGA CHAMELEON ULTRA
@@ -196,6 +212,40 @@
     </div>
   </div>
 
+
+  <!-- Screen: Storico Transazioni -->
+  <div id="history-screen" class="screen hidden">
+    <div class="app-header">
+      <button class="header-back" onclick="app.showScreen('dashboard-screen')">◀</button>
+      Storico Ricariche
+    </div>
+    <div class="scroll-container">
+      <div id="history-list"></div>
+    </div>
+  </div>
+
+  <!-- Screen: Messaggi Admin -->
+  <div id="broadcasts-screen" class="screen hidden">
+    <div class="app-header">
+      <button class="header-back" onclick="app.showScreen('dashboard-screen')">◀</button>
+      Messaggi Fox Energy
+    </div>
+    <div class="scroll-container">
+      <div id="broadcasts-list"></div>
+    </div>
+  </div>
+
+  <!-- Screen: Profilo Utente -->
+  <div id="profile-screen" class="screen hidden">
+    <div class="app-header">
+      <button class="header-back" onclick="app.showScreen('dashboard-screen')">◀</button>
+      Il Mio Profilo
+    </div>
+    <div class="scroll-container">
+      <div id="profile-content"></div>
+    </div>
+  </div>
+
   <!-- Slot Picker -->
   <div id="slot-picker" class="modal-overlay hidden">
     <div class="bottom-sheet">
@@ -221,6 +271,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=29"></script>
+  <script src="app.js?v=30"></script>
 </body>
 </html>

@@ -1,5 +1,7 @@
 <?php
-function db() {
+function db(): PDO {
+    static $pdo = null;
+    if ($pdo !== null) return $pdo;
     $host = getenv('MYSQLHOST') ?: 'localhost';
     $user = getenv('MYSQLUSER') ?: 'root';
     $pass = getenv('MYSQLPASSWORD') ?: '';
