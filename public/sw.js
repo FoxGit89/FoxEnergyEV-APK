@@ -1,13 +1,13 @@
-const CACHE_NAME = 'calisync-v21';
+const CACHE_NAME = 'calisync-v22';
 const ASSETS = [
   './',
-  './index.html?v=21',
-  './style.css?v=21',
-  './app.js?v=21',
-  './manifest.json?v=21',
-  'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/index.global.js',
-  'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/Crypto1.global.js',
-  'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/plugin/WebbleAdapter.global.js'
+  './index.html?v=22',
+  './style.css?v=22',
+  './app.js?v=22',
+  './manifest.json?v=22',
+  'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0.4.6/dist/index.global.js',
+  'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0.4.6/dist/Crypto1.global.js',
+  'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0.4.6/dist/plugin/WebbleAdapter.global.js'
 ];
 
 self.addEventListener('install', event => {
