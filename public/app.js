@@ -268,8 +268,10 @@ const app = {
     try {
       const d = await this.apiCall({ action:'get_broadcasts', user_id:this.user.telegramId });
       this._broadcasts = d.broadcasts||[];
+      // Conta solo messaggi ultimi 7 giorni per il badge
+      const cutoff = Date.now() - 7*24*60*60*1000;
+      const n = this._broadcasts.filter(m => new Date(m.scheduled_at).getTime() >= cutoff).length;
       const bcBadge = document.getElementById('broadcasts-badge');
-      const n = this._broadcasts.length;
       if (bcBadge) { if(n>0){bcBadge.textContent=n>9?'9+':n;bcBadge.classList.remove('hidden');}else bcBadge.classList.add('hidden'); }
     } catch(e) {}
   },
