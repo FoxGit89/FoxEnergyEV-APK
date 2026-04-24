@@ -668,41 +668,43 @@ input {
 /* ==========================================
    Dashboard action bar
    ========================================== */
-.dash-action-bar {
-  display: flex;
-  gap: 8px;
-  padding: 12px 15px 0;
-  margin-bottom: 4px;
+.bottom-bar {
+  flex-shrink: 0;
+  padding: 8px 15px 0;
+  background: linear-gradient(to top, #000 70%, transparent);
 }
-.dash-action-btn {
+.tab-bar {
+  display: flex;
+  gap: 0;
+  padding: 6px 0 max(16px, env(safe-area-inset-bottom));
+}
+.tab-btn {
   flex: 1;
-  background: var(--bg-card);
-  border-radius: 14px;
-  padding: 12px 8px;
+  background: transparent;
+  border: none;
+  color: rgba(255,255,255,0.5);
   display: flex;
   flex-direction: column;
   align-items: center;
-  gap: 4px;
-  color: white;
-  font-size: 12px;
-  font-weight: 600;
-  position: relative;
-  border: none;
+  gap: 2px;
+  padding: 6px 4px;
   cursor: pointer;
-  box-shadow: 0 2px 6px rgba(0,0,0,0.3);
+  position: relative;
+  transition: color 0.2s;
 }
-.dash-action-btn:active { opacity: 0.7; }
-.dash-action-icon { font-size: 22px; }
-.action-badge {
+.tab-btn:active { color: var(--primary-orange); }
+.tab-icon  { font-size: 20px; }
+.tab-label { font-size: 10px; font-weight: 600; letter-spacing: 0.3px; }
+.tab-badge {
   position: absolute;
-  top: 6px; right: 6px;
+  top: 2px; right: calc(50% - 18px);
   background: #FF5252;
   color: white;
-  font-size: 10px;
+  font-size: 9px;
   font-weight: 900;
-  min-width: 16px;
-  height: 16px;
-  border-radius: 8px;
+  min-width: 14px;
+  height: 14px;
+  border-radius: 7px;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1155,57 +1157,111 @@ input {
 .tariffa-orario { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
 
 /* ==========================================
-   Istruzioni uso — dashboard
+   Carosello istruzioni — dashboard
    ========================================== */
 .how-to-section {
-  padding: 4px 15px 8px;
+  padding: 4px 15px 6px;
 }
-.how-to-title {
+.how-to-carousel-wrap {
+  overflow: hidden;
+  border-radius: 14px;
+}
+.how-to-carousel {
+  display: flex;
+  transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+  will-change: transform;
+}
+.how-to-slide {
+  min-width: 100%;
+  background: var(--bg-card);
+  border-left: 3px solid rgba(255,152,0,0.5);
+  padding: 12px 16px;
+  box-sizing: border-box;
+}
+.how-to-slide.warn {
+  border-left-color: rgba(255,152,0,0.8);
+  background: rgba(255,152,0,0.07);
+}
+.slide-num {
   font-size: 11px;
-  font-weight: 700;
-  color: var(--text-muted);
-  letter-spacing: 1.5px;
+  font-weight: 900;
+  color: var(--primary-orange);
+  letter-spacing: 1px;
   text-transform: uppercase;
-  margin-bottom: 10px;
-  padding-left: 2px;
+  margin-bottom: 3px;
 }
-.how-to-steps {
+.how-to-slide.warn .slide-num { font-size: 14px; }
+.slide-title { font-size: 14px; font-weight: 700; margin-bottom: 3px; }
+.slide-desc  { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+/* Dots navigazione */
+.how-to-dots {
+  display: flex;
+  justify-content: center;
+  gap: 6px;
+  padding: 7px 0 2px;
+}
+.how-to-dot {
+  width: 6px; height: 6px;
+  border-radius: 50%;
+  background: rgba(255,255,255,0.2);
+  transition: background 0.3s, width 0.3s;
+  cursor: pointer;
+}
+.how-to-dot.active {
+  background: var(--primary-orange);
+  width: 18px;
+  border-radius: 3px;
+}
+
+/* ==========================================
+   Dashboard no-scroll — layout fisso
+   ========================================== */
+#dashboard-screen {
   display: flex;
   flex-direction: column;
-  gap: 2px;
+  height: 100vh;
+  overflow: hidden;
 }
-.how-to-step {
-  display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  background: var(--bg-card);
-  border-radius: 14px;
-  padding: 12px 14px;
-  border-left: 3px solid rgba(255,152,0,0.4);
-}
-.how-to-step.warn {
-  border-left-color: rgba(255,152,0,0.7);
-  background: rgba(255,152,0,0.06);
-}
-.step-num {
-  width: 26px;
-  height: 26px;
-  border-radius: 50%;
-  background: rgba(255,152,0,0.15);
-  color: var(--primary-orange);
-  font-size: 13px;
-  font-weight: 900;
-  display: flex;
-  align-items: center;
-  justify-content: center;
+#dashboard-screen .app-header {
   flex-shrink: 0;
-  margin-top: 1px;
 }
-.how-to-step.warn .step-num {
-  background: transparent;
-  font-size: 18px;
-  width: 26px;
+#dashboard-screen .container {
+  flex: 1;
+  overflow: hidden;
+  padding: 10px 0 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0;
 }
-.step-body      { flex: 1; }
-.step-title     { font-size: 14px; font-weight: 700; margin-bottom: 2px; }
-.step-desc      { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+/* Card portafoglio più compatta */
+#dashboard-screen .dashboard-card {
+  margin: 0 15px 6px;
+  padding: 14px 18px;
+}
+#dashboard-screen .dash-balance {
+  font-size: 38px;
+}
+#dashboard-screen .dash-balance-label {
+  font-size: 10px;
+  margin-bottom: 2px;
+}
+#dashboard-screen .dash-balance-wrap {
+  padding: 6px 0 4px;
+}
+#dashboard-screen .dash-top {
+  margin-bottom: 4px;
+}
+#dashboard-screen .dash-divider {
+  margin: 8px 0;
+}
+/* Action bar compatta */
+#dashboard-screen .bottom-bar {
+  padding: 8px 15px 0;
+}
+#dashboard-screen .btn-connect-main {
+  font-size: 16px !important;
+  padding: 16px !important;
+  border-radius: 16px !important;
+  letter-spacing: 1.5px !important;
+  margin-bottom: 0 !important;
+}

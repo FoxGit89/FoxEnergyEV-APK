@@ -118,6 +118,7 @@ const app = {
       this.renderDashboard();
       this.renderSlots();
       this.showScreen('dashboard-screen');
+      this._initCarousel();
       // Carica broadcasts in background (non blocca il caricamento)
       this._loadBroadcastsBadge();
     } catch(e) { console.error(e); alert(`Errore:\n${e.message||'Connessione fallita.'}`); this.logout(); }
@@ -233,6 +234,33 @@ const app = {
   selectCardForSlot(card) {
     if (this.currentSlotSelection) { this.mapping[this.currentSlotSelection]=card; this.renderSlots(); }
     this.hideSlotPicker();
+  },
+
+  // ── CAROSELLO ISTRUZIONI ──
+  _initCarousel() {
+    const carousel = document.getElementById('how-to-carousel');
+    const dots     = document.querySelectorAll('.how-to-dot');
+    if (!carousel || !dots.length) return;
+    let current = 0;
+    const slides = carousel.querySelectorAll('.how-to-slide');
+    const total  = slides.length;
+    const update = (idx) => {
+      current = (idx + total) % total;
+      carousel.style.transform = `translateX(-${current * 100}%)`;
+      dots.forEach((d,i) => d.classList.toggle('active', i===current));
+    };
+    // Swipe touch
+    let startX = 0;
+    carousel.addEventListener('touchstart', e => { startX = e.touches[0].clientX; }, {passive:true});
+    carousel.addEventListener('touchend',   e => {
+      const dx = e.changedTouches[0].clientX - startX;
+      if (Math.abs(dx) > 40) update(current + (dx < 0 ? 1 : -1));
+    }, {passive:true});
+    // Dot click
+    dots.forEach((d,i) => d.addEventListener('click', () => update(i)));
+    // Auto-avanza ogni 4s
+    if (this._carouselTimer) clearInterval(this._carouselTimer);
+    this._carouselTimer = setInterval(() => update(current+1), 4000);
   },
 
   // ── BROADCASTS badge loader ──

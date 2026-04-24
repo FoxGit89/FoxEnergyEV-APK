@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>CaliSync by Fox Energy EV</title>
   <meta name="theme-color" content="#FF9800">
-  <link rel="manifest" href="manifest.json?v=33">
-  <link rel="stylesheet" href="style.css?v=33">
+  <link rel="manifest" href="manifest.json?v=35">
+  <link rel="stylesheet" href="style.css?v=35">
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/index.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/Crypto1.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/plugin/WebbleAdapter.global.js"></script>
@@ -52,7 +52,7 @@
       <span id="dash-header-title">CALISYNC</span>
       <button class="header-action" onclick="app.logout()">🚪</button>
     </div>
-    <div class="container" style="padding-bottom:140px">
+    <div class="container">
       <div id="dash-card" class="dashboard-card" onclick="app.showScreen('stats-screen')">
         <!-- Riga 1: livello + badge premium -->
         <div class="dash-top">
@@ -83,61 +83,60 @@
         </div>
       </div>
     </div>
-    <!-- Istruzioni uso -->
+    <!-- Istruzioni a carosello -->
     <div class="how-to-section">
-      <div class="how-to-title">Come funziona</div>
-      <div class="how-to-steps">
-        <div class="how-to-step">
-          <div class="step-num">1</div>
-          <div class="step-body">
-            <div class="step-title">Collega il Chameleon</div>
-            <div class="step-desc">Premi il pulsante in basso. Il dispositivo verrà pulito automaticamente e potrai scegliere le tessere da caricare.</div>
+      <div class="how-to-carousel-wrap">
+        <div class="how-to-carousel" id="how-to-carousel">
+          <div class="how-to-slide">
+            <div class="slide-num">1</div>
+            <div class="slide-title">Collega il Chameleon</div>
+            <div class="slide-desc">Premi il pulsante. Il dispositivo viene pulito e puoi scegliere le tessere da caricare.</div>
           </div>
-        </div>
-        <div class="how-to-step">
-          <div class="step-num">2</div>
-          <div class="step-body">
-            <div class="step-title">Seleziona e sincronizza</div>
-            <div class="step-desc">Assegna una o più tessere RFID agli slot disponibili, poi avvia la sincronizzazione.</div>
+          <div class="how-to-slide">
+            <div class="slide-num">2</div>
+            <div class="slide-title">Seleziona e sincronizza</div>
+            <div class="slide-desc">Assegna le tessere RFID agli slot e avvia la sincronizzazione.</div>
           </div>
-        </div>
-        <div class="how-to-step">
-          <div class="step-num">3</div>
-          <div class="step-body">
-            <div class="step-title">Usa la tessera — 60 secondi</div>
-            <div class="step-desc">Avvicinati alla colonnina con il Chameleon. Hai 60 secondi. Alla scadenza gli slot vengono cancellati in automatico.</div>
+          <div class="how-to-slide">
+            <div class="slide-num">3</div>
+            <div class="slide-title">Usa — hai 60 secondi</div>
+            <div class="slide-desc">Avvicinati alla colonnina. Alla scadenza gli slot vengono cancellati in automatico.</div>
           </div>
-        </div>
-        <div class="how-to-step warn">
-          <div class="step-num">⚠️</div>
-          <div class="step-body">
-            <div class="step-title">Tieni il telefono vicino</div>
-            <div class="step-desc">Non chiudere l'app durante la sessione. Se il Bluetooth si disconnette, gli admin vengono avvisati automaticamente.</div>
+          <div class="how-to-slide warn">
+            <div class="slide-num">⚠️</div>
+            <div class="slide-title">Tieni il telefono vicino</div>
+            <div class="slide-desc">Non chiudere l'app. Se BT si disconnette gli admin vengono avvisati.</div>
           </div>
         </div>
       </div>
+      <div class="how-to-dots" id="how-to-dots">
+        <span class="how-to-dot active"></span>
+        <span class="how-to-dot"></span>
+        <span class="how-to-dot"></span>
+        <span class="how-to-dot"></span>
+      </div>
     </div>
 
-    <!-- Action bar dashboard -->
-    <div class="dash-action-bar">
-      <button class="dash-action-btn" onclick="app.showHistory()">
-        <span class="dash-action-icon">📋</span>
-        <span>Storico</span>
-      </button>
-      <button class="dash-action-btn" onclick="app.showBroadcasts()">
-        <span class="dash-action-icon">📢</span>
-        <span>Messaggi</span>
-        <span id="broadcasts-badge" class="action-badge hidden">0</span>
-      </button>
-      <button class="dash-action-btn" onclick="app.showProfile()">
-        <span class="dash-action-icon">👤</span>
-        <span>Profilo</span>
-      </button>
-    </div>
-    <div class="sync-bar">
+    <!-- Sync bar + tab bar unificate -->
+    <div class="bottom-bar">
       <button class="btn-primary btn-connect-main" onclick="app.startConnectFlow()">
         🔗 COLLEGA CHAMELEON ULTRA
       </button>
+      <div class="tab-bar">
+        <button class="tab-btn" onclick="app.showHistory()">
+          <span class="tab-icon">📋</span>
+          <span class="tab-label">Storico</span>
+        </button>
+        <button class="tab-btn" onclick="app.showBroadcasts()">
+          <span class="tab-icon">📢</span>
+          <span class="tab-label">Messaggi</span>
+          <span id="broadcasts-badge" class="tab-badge hidden">0</span>
+        </button>
+        <button class="tab-btn" onclick="app.showProfile()">
+          <span class="tab-icon">👤</span>
+          <span class="tab-label">Profilo</span>
+        </button>
+      </div>
     </div>
   </div>
 
@@ -313,6 +312,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=33"></script>
+  <script src="app.js?v=35"></script>
 </body>
 </html>
