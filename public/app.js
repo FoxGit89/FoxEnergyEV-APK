@@ -106,7 +106,7 @@ const app = {
 
   async loadDashboard() {
     this.showScreen('auth-gate');
-    document.getElementById('dash-header-title').textContent = `CALISYNC • ${this.user.firstName}`;
+    document.getElementById('dash-header-title').textContent = `FOXSYNC • ${this.user.firstName}`;
     try {
       const dashData  = await this.apiCall({ action:'get_dashboard', user_id:this.user.telegramId });
       const cardsData = await this.apiCall({ action:'get_slots',     user_id:this.user.telegramId });
