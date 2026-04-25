@@ -798,6 +798,12 @@ window.bleEngine = {
       this.updateUI(100,'✅ Tessere caricate! Avvio sessione...','success');
       if(navigator.vibrate)navigator.vibrate([100,50,100]);
       await new Promise(r=>setTimeout(r,800));
+      // Registra apertura sessione nel DB
+      app.apiCall({
+        action:  'start_session',
+        user_id: telegramId,
+        slots:   loadedLabels.join(','),
+      }).catch(()=>{});
       secureSession.start(loadedLabels);
 
     } catch(err) {
