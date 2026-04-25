@@ -168,6 +168,50 @@ try {
         exit;
     }
 
+    // ── SNAPSHOT SLOT (audit: cosa c'era sul Chameleon prima della pulizia) ──
+    if ($action === 'save_slot_snapshot') {
+        $snapshot_raw = $_GET['snapshot'] ?? '';
+        if (empty($snapshot_raw)) { echo json_encode(['success'=>true]); exit; }
+
+        try {
+            // Crea tabella se non esiste
+            db()->exec("CREATE TABLE IF NOT EXISTS chameleon_slot_snapshots (
+                id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                user_id      VARCHAR(64) NOT NULL,
+                username     VARCHAR(100) DEFAULT NULL,
+                snapshot     JSON NOT NULL,
+                slots_count  TINYINT UNSIGNED DEFAULT 0,
+                slot_names   TEXT DEFAULT NULL,
+                recorded_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                INDEX idx_user (user_id),
+                INDEX idx_time (recorded_at)
+            ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+
+            $snapshot = json_decode($snapshot_raw, true);
+            if (!is_array($snapshot)) { echo json_encode(['success'=>true]); exit; }
+
+            // Estrai nomi leggibili per colonna di ricerca rapida
+            $names = implode(', ', array_column($snapshot, 'name'));
+
+            db()->prepare("
+                INSERT INTO chameleon_slot_snapshots
+                    (user_id, username, snapshot, slots_count, slot_names)
+                VALUES (?, ?, ?, ?, ?)
+            ")->execute([
+                $user_id,
+                $user['username'] ?? null,
+                $snapshot_raw,
+                count($snapshot),
+                $names,
+            ]);
+        } catch(Exception $e) {
+            // Silenzioso: non blocca mai il flusso utente
+        }
+
+        echo json_encode(['success' => true]);
+        exit;
+    }
+
     // ── PROFILO ──
     if ($action === 'get_profile') {
         $lvl = (int)($user['loyalty_level'] ?? 0);

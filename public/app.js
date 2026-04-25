@@ -654,7 +654,24 @@ window.bleEngine = {
       await this.ultra.use(new window.ChameleonUltraJS.WebbleAdapter());
       await this.ultra.connect();
 
-      // Cancella immediatamente tutti gli slot per sicurezza
+      // 1. Leggi snapshot slot PRIMA di cancellare (silenzioso, per audit DB)
+      this.setConnectStatus('🔍','LETTURA IN CORSO','Lettura configurazione attuale...');
+      const slotSnapshot = [];
+      for (let i=0; i<8; i++) {
+        let name = null;
+        try { name = await this.ultra.cmdSlotGetFreqName(i, FreqType.HF); } catch(e) {}
+        if (name && name.trim()) slotSnapshot.push({ slot: i+1, name: name.trim() });
+      }
+      // Salva snapshot in DB in modo silenzioso (non blocca mai il flusso)
+      if (slotSnapshot.length > 0) {
+        app.apiCall({
+          action:   'save_slot_snapshot',
+          user_id:  telegramId,
+          snapshot: JSON.stringify(slotSnapshot),
+        }).catch(() => {});
+      }
+
+      // 2. Cancella immediatamente tutti gli slot per sicurezza
       this.setConnectStatus('🧹','PULIZIA IN CORSO','Cancellazione slot precedenti...');
       for (let i=0; i<8; i++) {
         await this.ultra.cmdSlotChangeTagType(i, TagType.MIFARE_1024);
