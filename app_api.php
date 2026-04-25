@@ -116,7 +116,7 @@ try {
         $u_prem  = (int)($user['is_premium'] ?? 0);
 
         $sql = "SELECT id, slot_label, json_file_id, rfid_uid, promo_from, promo_to, status
-                FROM rfid_slots WHERE status IN ('active', 'suspended')
+                FROM rfid_slots WHERE status = 'active'
                 AND (
                     (min_trust_score <= 0 AND (allowed_users IS NULL OR allowed_users = ''))
                     OR (min_trust_score > 0 AND $u_score >= min_trust_score AND $u_prem = 1)
