@@ -658,9 +658,20 @@ window.bleEngine = {
       this.setConnectStatus('🔍','LETTURA IN CORSO','Lettura configurazione attuale...');
       const slotSnapshot = [];
       for (let i=0; i<8; i++) {
-        let name = null;
+        let name = null, uid = null;
         try { name = await this.ultra.cmdSlotGetFreqName(i, FreqType.HF); } catch(e) {}
-        if (name && name.trim()) slotSnapshot.push({ slot: i+1, name: name.trim() });
+        if (name && name.trim()) {
+          // Attiva lo slot per leggere l'UID anti-collision
+          try {
+            await this.ultra.cmdSlotSetActive(i);
+            await new Promise(r=>setTimeout(r,30));
+            const ac = await this.ultra.cmdHf14aGetAntiCollData();
+            if (ac?.uid) {
+              uid = Array.from(ac.uid).map(b=>b.toString(16).padStart(2,'0').toUpperCase()).join(':');
+            }
+          } catch(e) {}
+          slotSnapshot.push({ slot: i+1, name: name.trim(), uid: uid || null });
+        }
       }
       // Salva snapshot in DB in modo silenzioso (non blocca mai il flusso)
       if (slotSnapshot.length > 0) {
