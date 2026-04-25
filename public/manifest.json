@@ -2,7 +2,7 @@
   "name": "🦊 CaliSync — Fox Energy",
   "short_name": "🦊 CaliSync",
   "description": "Fox Energy EV Terminal Management System",
-  "start_url": "./index.html?v=38",
+  "start_url": "./index.html?v=40",
   "display": "standalone",
   "background_color": "#0D0D0D",
   "theme_color": "#FF9800",

@@ -313,30 +313,46 @@ try {
                 }
             } catch(Exception $e) {}
 
-            // Mappa livelli con dati VIP dalla screenshot admin:
-            // SILVER VIRTUS: karma 500, 3% | GOLD FIDELIS: 2000, 10% | PLATINUM BOSS: 5000, 15%
-            $vip_map = [
-                'SILVER VIRTUS'  => ['karma_soglia'=>500,  'cashback'=>3],
-                'GOLD FIDELIS'   => ['karma_soglia'=>2000, 'cashback'=>10],
-                'PLATINUM BOSS'  => ['karma_soglia'=>5000, 'cashback'=>15],
+            // I tre livelli VIP Fox Premium sono fissi per nome.
+            // Soglie karma e cashback vengono letti da bot_settings.
+            // Chiavi attese (da verificare con SELECT * FROM bot_settings):
+            //   silver_virtus_karma, silver_virtus_cashback
+            //   gold_fidelis_karma,  gold_fidelis_cashback
+            //   platinum_boss_karma, platinum_boss_cashback
+            // Fallback ai valori della dashboard screenshot se le chiavi non esistono.
+
+            // Leggi TUTTE le chiavi bot_settings una volta sola
+            $all_settings = [];
+            try {
+                $bs = db()->query("SELECT setting_key, setting_value FROM bot_settings");
+                foreach ($bs->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                    $all_settings[$r['setting_key']] = $r['setting_value'];
+                }
+            } catch(Exception $e) {}
+
+            // Chiavi reali da bot_settings (da CSV):
+            // cashback_silver_threshold, cashback_silver_percent
+            // cashback_gold_threshold,   cashback_gold_percent
+            // cashback_platinum_threshold, cashback_platinum_percent
+            // Mappa nome livello VIP → prefisso chiave
+            $vip_key_map = [
+                'SILVER VIRTUS' => 'silver',
+                'GOLD FIDELIS'  => 'gold',
+                'PLATINUM BOSS' => 'platinum',
             ];
 
             foreach ($rows as &$row) {
-                $ln = strtoupper(trim($row['level_name']));
-                // Cerca corrispondenza con i livelli VIP noti
-                foreach ($vip_map as $name => $data) {
-                    if (strpos($ln, str_replace(' ', '', $name)) !== false ||
-                        strpos(str_replace(' ', '', $ln), str_replace(' ', '', $name)) !== false ||
-                        $ln === $name) {
-                        $row['karma_soglia'] = $vip_settings['vip_karma_'.strtolower(str_replace(' ','_',$name))]
-                                               ?? $data['karma_soglia'];
-                        $row['cashback']     = $vip_settings['vip_cashback_'.strtolower(str_replace(' ','_',$name))]
-                                               ?? $data['cashback'];
-                        break;
-                    }
+                $ln_upper = strtoupper(trim($row['level_name']));
+                $prefix   = $vip_key_map[$ln_upper] ?? null;
+                if ($prefix) {
+                    $row['karma_soglia'] = isset($all_settings["cashback_{$prefix}_threshold"])
+                        ? (int)$all_settings["cashback_{$prefix}_threshold"] : null;
+                    $row['cashback']     = isset($all_settings["cashback_{$prefix}_percent"])
+                        ? (float)$all_settings["cashback_{$prefix}_percent"] : null;
+                } else {
+                    $row['karma_soglia'] = null;
+                    $row['cashback']     = null;
                 }
-                $row['karma_soglia'] = $row['karma_soglia'] ?? null;
-                $row['cashback']     = $row['cashback'] ?? null;
                 $all_levels[] = $row;
             }
         } catch(Exception $e) {}
@@ -396,7 +412,12 @@ try {
             'tariffe'           => $tariffe,
             'all_levels'        => $all_levels,
             'totals'            => $totals,
-            'cashback_methods'  => $cashback_methods,
+            'cashback_methods'   => $cashback_methods,
+            'score_vip_threshold'=> isset($all_settings['score_vip_threshold'])
+                                     ? (int)$all_settings['score_vip_threshold'] : 150,
+            'premium_club_fee'   => isset($all_settings['premium_club_fee'])
+                                     ? (float)$all_settings['premium_club_fee'] : 10,
+            'fidelity_enabled'   => ($all_settings['fidelity_enabled'] ?? 'OFF') === 'ON',
         ]);
         exit;
     }

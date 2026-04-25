@@ -1375,3 +1375,31 @@ input {
 .cashback-active-title { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
 .cashback-active-pct   { font-size: 26px; font-weight: 900; color: #4CAF50; line-height: 1.1; }
 .cashback-active-desc  { font-size: 12px; color: var(--text-muted); }
+
+/* ==========================================
+   Premium cashback in card + CTA non-premium
+   ========================================== */
+.premium-cashback {
+  font-size: 12px;
+  color: rgba(255,255,255,0.85);
+  margin-top: 2px;
+  font-weight: 600;
+}
+.premium-cta {
+  background: var(--bg-card);
+  border-radius: 16px;
+  padding: 14px 16px;
+  margin-bottom: 16px;
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  border: 1px solid rgba(255,255,255,0.08);
+}
+.premium-cta.can-activate {
+  border-color: rgba(255,152,0,0.4);
+  background: rgba(255,152,0,0.07);
+}
+.premium-cta-icon  { font-size: 28px; flex-shrink: 0; }
+.premium-cta-title { font-size: 14px; font-weight: 700; margin-bottom: 3px; }
+.premium-cta-desc  { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
+.premium-cta.can-activate .premium-cta-title { color: var(--primary-orange); }

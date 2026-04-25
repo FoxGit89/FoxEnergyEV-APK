@@ -426,20 +426,35 @@ const app = {
       ? new Date(d.member_since).toLocaleDateString('it-IT',{month:'long',year:'numeric'}) : '';
     const saldo = parseFloat(d.saldo_kwh||0).toFixed(2);
 
-    // ── Giorni premium rimanenti ──
+    // ── Card Fox Premium ──
+    const karma        = parseInt(d.trust_score||0);
+    const fee          = d.premium_club_fee || 10;
+    const minKarma     = d.score_vip_threshold || 150;
+    const fidelityOn   = d.fidelity_enabled !== false;
+
     let premiumHtml = '';
     if (isPremium && d.premium_expires) {
-      const exp  = new Date(d.premium_expires);
-      const days = d.premium_days_left ?? Math.max(0, Math.round((exp-Date.now())/86400000));
+      // Trova il livello VIP attivo in base al karma
+      const vipLevels = (d.all_levels||[]).filter(l=>l.karma_soglia!=null)
+                                          .sort((a,b)=>a.karma_soglia-b.karma_soglia);
+      let vipActive = null;
+      vipLevels.forEach(l => { if (karma >= parseInt(l.karma_soglia)) vipActive = l; });
+
+      const exp    = new Date(d.premium_expires);
+      const days   = d.premium_days_left ?? Math.max(0, Math.round((exp-Date.now())/86400000));
       const expStr = exp.toLocaleDateString('it-IT',{day:'2-digit',month:'long',year:'numeric'});
       const urgClass = days<=7 ? 'prem-expiry-urgent' : days<=30 ? 'prem-expiry-warn' : '';
+      const vipName  = vipActive?.level_name || 'Fox Premium';
+      const vipCb    = vipActive?.cashback;
+
       premiumHtml = `
         <div class="premium-card">
           <div class="premium-card-top">
             <div class="premium-star">⭐</div>
-            <div>
-              <div class="premium-title">FOX PREMIUM ATTIVO</div>
-              <div class="premium-level">${this._esc(lvlName)}</div>
+            <div style="flex:1">
+              <div class="premium-title">FOX PREMIUM CLUB</div>
+              <div class="premium-level">${this._esc(vipName)}</div>
+              ${vipCb ? `<div class="premium-cashback">💰 Cashback +${vipCb}%</div>` : ''}
             </div>
             <div class="premium-days ${urgClass}">
               <div class="premium-days-num">${days}</div>
@@ -447,14 +462,28 @@ const app = {
             </div>
           </div>
           <div class="premium-expiry ${urgClass}">
-            ${days<=7?'⚠️ ':''}Scade il ${expStr}
+            ${days<=7?'⚠️ ':'📅 '}Scade il ${expStr} · Fee € ${fee}/mese
+          </div>
+        </div>`;
+    } else if (!isPremium) {
+      // Utente non premium: mostra info per attivare
+      const canActivate = karma >= minKarma;
+      premiumHtml = `
+        <div class="premium-cta ${canActivate?'can-activate':''}">
+          <div class="premium-cta-icon">${canActivate?'🦊':'🔒'}</div>
+          <div class="premium-cta-body">
+            <div class="premium-cta-title">${canActivate?'Puoi attivare Fox Premium!':'Fox Premium Club'}</div>
+            <div class="premium-cta-desc">
+              ${canActivate
+                ? `Hai ${karma} karma — soglia minima raggiunta (${minKarma}). Fee mensile: € ${fee}.`
+                : `Karma richiesto: ${minKarma} · Il tuo karma: ${karma} · Mancano: ${Math.max(0,minKarma-karma)}`}
+            </div>
           </div>
         </div>`;
     }
 
     // ── Livelli VIP Fox Fidelity con karma e cashback ──
     const levels  = (d.all_levels||[]).filter(l=>l.karma_soglia!=null).sort((a,b)=>a.karma_soglia-b.karma_soglia);
-    const karma   = parseInt(d.trust_score||0);
     // Trova livello corrente (massimo raggiunto)
     let curIdx = -1;
     levels.forEach((l,i)=>{ if(karma>=(parseInt(l.karma_soglia)||0)) curIdx=i; });
@@ -498,7 +527,7 @@ const app = {
     let fidelityHtml = '';
     if (levels.length) {
       fidelityHtml = `
-        <div class="profile-section-title">🦊 Fox Fidelity Program</div>
+        <div class="profile-section-title">⭐ Fox Premium — Livelli VIP</div>
         <div class="fidelity-table">
           <div class="fidelity-header"><span>Livello</span><span>Karma</span><span>Cashback</span></div>
           ${levels.map((l,i)=>{
@@ -536,7 +565,7 @@ const app = {
       </div>
 
       ${premiumHtml}
-      ${!isPremium?`<div class="profile-level-badge">${this._esc(lvlName)}</div>`:''}
+      ${!isPremium?`<div class="profile-level-badge">🦊 Fox Standard</div>`:''}
 
       <div class="profile-stats-row">
         <div class="profile-stat">
