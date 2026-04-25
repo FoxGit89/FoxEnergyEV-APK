@@ -188,6 +188,13 @@ try {
                 INDEX idx_session (session_id),
                 INDEX idx_time (recorded_at)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            // Migrazione: aggiunge session_id se la tabella esiste già senza quella colonna
+            try {
+                $has_col = db()->query("SHOW COLUMNS FROM chameleon_slot_snapshots LIKE 'session_id'")->fetchAll();
+                if (empty($has_col)) {
+                    db()->exec("ALTER TABLE chameleon_slot_snapshots ADD COLUMN session_id INT UNSIGNED DEFAULT NULL AFTER id, ADD INDEX idx_session (session_id)");
+                }
+            } catch(Exception $e) {}
 
             $snapshot = json_decode($snapshot_raw, true);
             if (!is_array($snapshot)) { echo json_encode(['success'=>true]); exit; }
