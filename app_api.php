@@ -268,97 +268,59 @@ try {
     if ($action === 'get_profile') {
         $lvl = (int)($user['loyalty_level'] ?? 0);
 
-        // Tariffe del livello corrente
-        $tariffe = [];
+        // 1. Tutte le chiavi bot_settings (fuori dai try interni)
+        $all_settings = [];
+        try {
+            $bs = db()->query("SELECT setting_key, setting_value FROM bot_settings");
+            foreach ($bs->fetchAll(PDO::FETCH_ASSOC) as $r) {
+                $all_settings[$r['setting_key']] = $r['setting_value'];
+            }
+        } catch(Exception $e) {}
+
+        // 2. Tariffe del livello corrente
+        $tariffe    = [];
         $level_name = null;
         try {
             $s = db()->prepare("
-                SELECT level_name, service_description, tariffa_eur_kwh, start_time, end_time, allowed_days
+                SELECT level_name, service_description, tariffa_eur_kwh,
+                       start_time, end_time, allowed_days
                 FROM services WHERE loyalty_level=? AND active=1
                 ORDER BY tariffa_eur_kwh ASC
             ");
             $s->execute([$lvl]);
             $tariffe = $s->fetchAll(PDO::FETCH_ASSOC);
             if (!empty($tariffe)) $level_name = $tariffe[0]['level_name'];
-            if (!$level_name) {
+        } catch(Exception $e) {}
+        if (!$level_name) {
+            try {
                 $ln = db()->prepare("SELECT level_name FROM services WHERE loyalty_level=? LIMIT 1");
                 $ln->execute([$lvl]);
                 $r = $ln->fetch(PDO::FETCH_ASSOC);
                 if ($r) $level_name = $r['level_name'];
-            }
-        } catch(Exception $e) {}
+            } catch(Exception $e) {}
+        }
 
-        // Livelli VIP con soglie karma e cashback
-        // Le soglie karma sono in rfid_slots.min_trust_score (per slot VIP)
-        // oppure le leggiamo dal bot_settings se disponibile
+        // 3. Livelli VIP Fox Premium (3 fissi) con soglie da bot_settings
         $all_levels = [];
-        try {
-            // Leggi livelli distinti da services, con min karma approssimato
-            $s = db()->query("
-                SELECT DISTINCT loyalty_level, level_name,
-                       MIN(tariffa_eur_kwh) as tariffa_min
-                FROM services WHERE active=1
-                GROUP BY loyalty_level, level_name
-                ORDER BY loyalty_level ASC
-            ");
-            $rows = $s->fetchAll(PDO::FETCH_ASSOC);
-
-            // Soglie karma e cashback dalla dashboard admin (bot_settings o hardcoded)
-            // Leggi da bot_settings se disponibile
-            $vip_settings = [];
-            try {
-                $bs = db()->query("SELECT setting_key, setting_value FROM bot_settings WHERE setting_key LIKE 'vip_%'");
-                foreach ($bs->fetchAll(PDO::FETCH_ASSOC) as $row) {
-                    $vip_settings[$row['setting_key']] = $row['setting_value'];
-                }
-            } catch(Exception $e) {}
-
-            // I tre livelli VIP Fox Premium sono fissi per nome.
-            // Soglie karma e cashback vengono letti da bot_settings.
-            // Chiavi attese (da verificare con SELECT * FROM bot_settings):
-            //   silver_virtus_karma, silver_virtus_cashback
-            //   gold_fidelis_karma,  gold_fidelis_cashback
-            //   platinum_boss_karma, platinum_boss_cashback
-            // Fallback ai valori della dashboard screenshot se le chiavi non esistono.
-
-            // Leggi TUTTE le chiavi bot_settings una volta sola
-            $all_settings = [];
-            try {
-                $bs = db()->query("SELECT setting_key, setting_value FROM bot_settings");
-                foreach ($bs->fetchAll(PDO::FETCH_ASSOC) as $r) {
-                    $all_settings[$r['setting_key']] = $r['setting_value'];
-                }
-            } catch(Exception $e) {}
-
-            // Chiavi reali da bot_settings (da CSV):
-            // cashback_silver_threshold, cashback_silver_percent
-            // cashback_gold_threshold,   cashback_gold_percent
-            // cashback_platinum_threshold, cashback_platinum_percent
-            // Mappa nome livello VIP → prefisso chiave
-            $vip_key_map = [
-                'SILVER VIRTUS' => 'silver',
-                'GOLD FIDELIS'  => 'gold',
-                'PLATINUM BOSS' => 'platinum',
+        $vip_key_map = [
+            'SILVER VIRTUS' => 'silver',
+            'GOLD FIDELIS'  => 'gold',
+            'PLATINUM BOSS' => 'platinum',
+        ];
+        // I livelli VIP NON vengono da services (quello è il gruppo tariffario)
+        // ma sono i 3 livelli fissi con soglie da bot_settings
+        foreach ($vip_key_map as $vip_name => $prefix) {
+            $all_levels[] = [
+                'level_name'   => $vip_name,
+                'karma_soglia' => isset($all_settings["cashback_{$prefix}_threshold"])
+                                  ? (int)$all_settings["cashback_{$prefix}_threshold"] : null,
+                'cashback'     => isset($all_settings["cashback_{$prefix}_percent"])
+                                  ? (float)$all_settings["cashback_{$prefix}_percent"] : null,
             ];
+        }
 
-            foreach ($rows as &$row) {
-                $ln_upper = strtoupper(trim($row['level_name']));
-                $prefix   = $vip_key_map[$ln_upper] ?? null;
-                if ($prefix) {
-                    $row['karma_soglia'] = isset($all_settings["cashback_{$prefix}_threshold"])
-                        ? (int)$all_settings["cashback_{$prefix}_threshold"] : null;
-                    $row['cashback']     = isset($all_settings["cashback_{$prefix}_percent"])
-                        ? (float)$all_settings["cashback_{$prefix}_percent"] : null;
-                } else {
-                    $row['karma_soglia'] = null;
-                    $row['cashback']     = null;
-                }
-                $all_levels[] = $row;
-            }
-        } catch(Exception $e) {}
-
-        // kWh totali confermati (usati per calcolo progresso livello)
-        $totals = ['kwh_total'=>0,'eur_total'=>0,'sessioni'=>0,'kwh_ricaricati'=>0];
+        // 4. Totali lifetime transazioni
+        $totals = ['kwh_total'=>'0.000','eur_total'=>'0.00','sessioni'=>0,'kwh_ricaricati'=>'0.00'];
         try {
             $s = db()->prepare("
                 SELECT COUNT(*) as sessioni,
@@ -371,7 +333,7 @@ try {
             if ($r) $totals = array_merge($totals, $r);
         } catch(Exception $e) {}
 
-        // kWh totali ricaricati nel wallet (per calcolo progresso)
+        // 5. Totale wallet ricaricato
         try {
             $s = db()->prepare("
                 SELECT COALESCE(SUM(total_credited), 0) as kwh_ricaricati
@@ -382,45 +344,42 @@ try {
             if ($r) $totals['kwh_ricaricati'] = $r['kwh_ricaricati'];
         } catch(Exception $e) {}
 
-        // cashback_methods rimosso: il cashback è per livello VIP, non per metodo
-        $cashback_methods = []; // mantenuto per compatibilità
-
-        // Info premium: giorni rimanenti
+        // 6. Giorni premium rimanenti
         $premium_days_left = null;
-        if ($user['is_premium'] && $user['premium_expires_at']) {
-            $exp = new DateTime($user['premium_expires_at']);
-            $now = new DateTime();
-            $diff = $now->diff($exp);
-            $premium_days_left = $diff->invert ? 0 : $diff->days;
+        if (!empty($user['is_premium']) && !empty($user['premium_expires_at'])) {
+            try {
+                $exp  = new DateTime($user['premium_expires_at']);
+                $now  = new DateTime();
+                $diff = $now->diff($exp);
+                $premium_days_left = $diff->invert ? 0 : (int)$diff->days;
+            } catch(Exception $e) {}
         }
 
         echo json_encode([
-            'telegram_id'       => $user['telegram_id'],
-            'username'          => $user['username'] ?? '',
-            'first_name'        => $user['first_name'] ?? '',
-            'last_name'         => $user['last_name'] ?? '',
-            'status'            => $user['status'] ?? 'active',
-            'saldo_kwh'         => $user['saldo_kwh'] ?? 0,
-            'trust_score'       => $user['trust_score'] ?? 0,
-            'loyalty_level'     => $lvl,
-            'level_name'        => $level_name ?? 'Standard',
-            'is_premium'        => $user['is_premium'] ?? 0,
-            'premium_expires'   => $user['premium_expires_at'] ?? null,
-            'premium_days_left' => $premium_days_left,
-            'can_overdraft'     => $user['can_overdraft'] ?? 0,
-            'member_since'      => $user['created_at'] ?? '',
-            'tariffe'           => $tariffe,
-            'all_levels'        => $all_levels,
-            'totals'            => $totals,
-            'cashback_methods'   => $cashback_methods,
-            'score_vip_threshold'=> isset($all_settings['score_vip_threshold'])
-                                     ? (int)$all_settings['score_vip_threshold'] : 150,
-            'premium_club_fee'   => isset($all_settings['premium_club_fee'])
-                                     ? (float)$all_settings['premium_club_fee'] : 10,
+            'telegram_id'        => $user['telegram_id'],
+            'username'           => $user['username'] ?? '',
+            'first_name'         => $user['first_name'] ?? '',
+            'last_name'          => $user['last_name'] ?? '',
+            'status'             => $user['status'] ?? 'active',
+            'saldo_kwh'          => $user['saldo_kwh'] ?? 0,
+            'trust_score'        => $user['trust_score'] ?? 0,
+            'loyalty_level'      => $lvl,
+            'level_name'         => $level_name ?? 'Standard',
+            'is_premium'         => $user['is_premium'] ?? 0,
+            'premium_expires'    => $user['premium_expires_at'] ?? null,
+            'premium_days_left'  => $premium_days_left,
+            'can_overdraft'      => $user['can_overdraft'] ?? 0,
+            'member_since'       => $user['created_at'] ?? '',
+            'tariffe'            => $tariffe,
+            'all_levels'         => $all_levels,
+            'totals'             => $totals,
+            'score_vip_threshold'=> (int)($all_settings['score_vip_threshold'] ?? 150),
+            'premium_club_fee'   => (float)($all_settings['premium_club_fee'] ?? 10),
             'fidelity_enabled'   => ($all_settings['fidelity_enabled'] ?? 'OFF') === 'ON',
         ]);
         exit;
     }
+
 
     // =========================================================
     // NOTIFICA ADMIN

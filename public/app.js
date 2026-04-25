@@ -582,8 +582,6 @@ const app = {
         </div>
       </div>
 
-      ${progressHtml}
-
       <div class="profile-section-title">📊 Totale lifetime</div>
       <div class="profile-lifetime">
         <div class="lifetime-item">
