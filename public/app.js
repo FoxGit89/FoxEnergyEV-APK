@@ -138,7 +138,7 @@ const app = {
   },
 
   renderSlots() {
-    // Popola solo la connect-screen (la dashboard ha solo il pulsante Collega)
+    // Popola connect-slot-list (connect-screen)
     let canSync=false;
     const list=document.getElementById('connect-slot-list');
     if (list) {
@@ -154,6 +154,34 @@ const app = {
     }
     const syncBtn=document.getElementById('connect-proceed-btn');
     if (syncBtn) { if(canSync)syncBtn.classList.remove('hidden'); else syncBtn.classList.add('hidden'); }
+
+    // Popola sezione slot nella dashboard (con operatori)
+    this._renderDashSlots();
+  },
+
+  _renderDashSlots() {
+    const section = document.getElementById('dash-slots-section');
+    if (!section || !this.cards || !this.cards.length) return;
+    section.classList.remove('hidden');
+    section.innerHTML = `<div class="dash-slots-title">💾 Tessere disponibili</div>` +
+      this.cards.map(card => {
+        const allOps  = card.operators||[];
+        const usedOps = card.used_operators||[];
+        const promo   = card.is_promo ? `<span class="slot-promo-badge">PROMO</span>` : '';
+
+        const opsHtml = allOps.length
+          ? `<div class="dash-slot-ops">🔌 ${allOps.slice(0,3).map(o=>this._esc(o)).join(' · ')}${allOps.length>3?' +'+(allOps.length-3):''}</div>`
+          : '';
+        const usedHtml = usedOps.length
+          ? `<div class="dash-slot-used">✅ ${usedOps.slice(0,2).map(o=>this._esc(o)).join(', ')}${usedOps.length>2?' +'+(usedOps.length-2):''}</div>`
+          : '';
+
+        return `<div class="dash-slot-card">
+          <div class="dash-slot-name">${this._esc(card.slot_label)}${promo}</div>
+          ${opsHtml}
+          ${usedHtml}
+        </div>`;
+      }).join('');
   },
 
   openSlotPicker(slotNum) {

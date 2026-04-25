@@ -822,3 +822,47 @@ input {
 .tg-bot-icon  { font-size: 18px; flex-shrink: 0; }
 .tg-bot-text  { flex: 1; font-size: 12px; font-weight: 600; line-height: 1.4; }
 .tg-bot-arrow { font-size: 18px; opacity: 0.7; flex-shrink: 0; }
+
+/* ==========================================
+   Slot disponibili nella dashboard
+   ========================================== */
+.dash-slots-section {
+  padding: 4px 15px 6px;
+}
+.dash-slots-title {
+  font-size: 11px;
+  font-weight: 700;
+  color: var(--text-muted);
+  letter-spacing: 1.5px;
+  text-transform: uppercase;
+  margin-bottom: 8px;
+}
+.dash-slot-card {
+  background: var(--bg-card);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin-bottom: 5px;
+}
+.dash-slot-name {
+  font-size: 13px;
+  font-weight: 700;
+  margin-bottom: 3px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dash-slot-ops {
+  font-size: 11px;
+  color: var(--text-muted);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.dash-slot-used {
+  font-size: 11px;
+  color: #4CAF50;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
