@@ -791,3 +791,13 @@ input {
 .bc-subject { font-size:13px; font-weight:700; margin-bottom:4px; }
 .bc-text    { font-size:14px; line-height:1.5; color:rgba(255,255,255,0.85); white-space:pre-wrap; }
 .bc-date    { font-size:11px; color:var(--text-muted); margin-top:6px; }
+
+/* Operatori usati nello slot picker */
+.slot-used-ops {
+  font-size: 11px;
+  color: #4CAF50;
+  margin-top: 2px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}

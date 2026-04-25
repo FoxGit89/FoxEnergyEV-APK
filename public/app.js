@@ -162,7 +162,30 @@ const app = {
     list.innerHTML=`<div class="sheet-item clear" onclick="app.selectCardForSlot(null)"><div style="font-size:24px">🚫</div><div class="sheet-item-title">Svuota / Lascia vuoto</div></div>`;
     this.cards.forEach(card=>{
       const div=document.createElement('div'); div.className='sheet-item'; div.onclick=()=>this.selectCardForSlot(card);
-      div.innerHTML=`<div style="font-size:24px;color:var(--primary-orange)">💳</div><div class="sheet-item-title">${card.slot_label}</div>`;
+
+      // Operatori configurati (roaming_settings)
+      const allOps  = card.operators||[];
+      const opsLine = allOps.length
+        ? `<div class="slot-operators">🔌 ${allOps.slice(0,4).map(o=>this._esc(o)).join(' · ')}${allOps.length>4?' +'+(allOps.length-4):''}</div>`
+        : '';
+
+      // Operatori effettivamente usati dall'utente con questa tessera
+      const usedOps  = card.used_operators||[];
+      const usedLine = usedOps.length
+        ? `<div class="slot-used-ops">✅ Usata con: ${usedOps.slice(0,3).map(o=>this._esc(o)).join(', ')}${usedOps.length>3?' +'+(usedOps.length-3):''}</div>`
+        : '';
+
+      // Badge promo / sospesa
+      const promoBadge = card.is_promo ? `<span class="slot-promo-badge">PROMO</span>` : '';
+      const suspBadge  = card.status==='suspended' ? `<span class="slot-susp-badge">⚠️ Sospesa</span>` : '';
+
+      div.innerHTML=`
+        <div style="font-size:22px;color:var(--primary-orange);flex-shrink:0">💳</div>
+        <div style="flex:1;min-width:0">
+          <div class="sheet-item-title">${this._esc(card.slot_label)}${promoBadge}${suspBadge}</div>
+          ${opsLine}
+          ${usedLine}
+        </div>`;
       list.appendChild(div);
     });
     document.getElementById('slot-picker').classList.remove('hidden');

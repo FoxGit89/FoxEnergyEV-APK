@@ -110,20 +110,50 @@ try {
     // 3. INVIO LISTA SLOT AUTORIZZATI
     // =========================================================
     if ($action === 'get_slots') {
-        $u_tg = $user['telegram_id'];
-        $u_name = $user['username'] ?? '';
-        $u_score = $user['trust_score'] ?? 100;
-        $u_prem = $user['is_premium'] ?? 0;
+        $u_tg    = $user['telegram_id'];
+        $u_name  = $user['username'] ?? '';
+        $u_score = (int)($user['trust_score'] ?? 100);
+        $u_prem  = (int)($user['is_premium'] ?? 0);
 
-        $sql = "SELECT id, slot_label, json_file_id FROM rfid_slots WHERE status IN ('active', 'suspended') 
+        $sql = "SELECT id, slot_label, json_file_id, rfid_uid, promo_from, promo_to, status
+                FROM rfid_slots WHERE status IN ('active', 'suspended')
                 AND (
                     (min_trust_score <= 0 AND (allowed_users IS NULL OR allowed_users = ''))
                     OR (min_trust_score > 0 AND $u_score >= min_trust_score AND $u_prem = 1)
-                    OR FIND_IN_SET(" . db()->quote($u_tg) . ", allowed_users) > 0 
+                    OR FIND_IN_SET(" . db()->quote($u_tg) . ", allowed_users) > 0
                     OR FIND_IN_SET(" . db()->quote($u_name) . ", allowed_users) > 0
                 ) ORDER BY slot_label ASC";
 
         $slots = db()->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+
+        foreach ($slots as &$slot) {
+            $slot['operators']      = [];
+            $slot['used_operators'] = [];
+            $slot['is_promo']       = false;
+            try {
+                // Operatori configurati per questa tessera
+                $rs = db()->prepare("SELECT operator_name FROM roaming_settings WHERE rfid_slot_id=? AND is_hidden=0 ORDER BY operator_name ASC");
+                $rs->execute([$slot['id']]);
+                $slot['operators'] = $rs->fetchAll(PDO::FETCH_COLUMN);
+
+                // Operatori effettivamente usati dall'utente con questa tessera
+                $tu = db()->prepare("
+                    SELECT DISTINCT operator_name FROM transactions
+                    WHERE user_id=? AND rfid_slot_id=?
+                      AND operator_name IS NOT NULL AND operator_name != ''
+                      AND status IN ('CONFIRMED','PENDING','IN PROGRESS')
+                    ORDER BY operator_name ASC
+                ");
+                $tu->execute([$user['id'], $slot['id']]);
+                $slot['used_operators'] = $tu->fetchAll(PDO::FETCH_COLUMN);
+
+                // Promo attiva oggi
+                if (!empty($slot['promo_from']) && !empty($slot['promo_to'])) {
+                    $oggi = date('Y-m-d');
+                    $slot['is_promo'] = ($oggi >= $slot['promo_from'] && $oggi <= $slot['promo_to']);
+                }
+            } catch(Exception $e) {}
+        }
         echo json_encode($slots ?: []);
         exit;
     }
