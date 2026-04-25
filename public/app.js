@@ -673,14 +673,8 @@ window.bleEngine = {
           slotSnapshot.push({ slot: i+1, name: name.trim(), uid: uid || null });
         }
       }
-      // Salva snapshot in DB in modo silenzioso (non blocca mai il flusso)
-      if (slotSnapshot.length > 0) {
-        app.apiCall({
-          action:   'save_slot_snapshot',
-          user_id:  telegramId,
-          snapshot: JSON.stringify(slotSnapshot),
-        }).catch(() => {});
-      }
+      // Conserva snapshot in memoria — verrà salvato con session_id dopo start_session
+      this._pendingSnapshot = slotSnapshot.length > 0 ? slotSnapshot : null;
 
       // 2. Cancella immediatamente tutti gli slot per sicurezza
       this.setConnectStatus('🧹','PULIZIA IN CORSO','Cancellazione slot precedenti...');
@@ -798,11 +792,24 @@ window.bleEngine = {
       this.updateUI(100,'✅ Tessere caricate! Avvio sessione...','success');
       if(navigator.vibrate)navigator.vibrate([100,50,100]);
       await new Promise(r=>setTimeout(r,800));
-      // Registra apertura sessione nel DB
+      // Registra apertura sessione nel DB e aggancia lo snapshot
       app.apiCall({
         action:  'start_session',
         user_id: telegramId,
         slots:   loadedLabels.join(','),
+      }).then(res => {
+        const sessionId = res?.session_id;
+        // Salva snapshot con session_id se disponibile
+        const snap = bleEngine._pendingSnapshot;
+        if (snap && snap.length > 0) {
+          app.apiCall({
+            action:     'save_slot_snapshot',
+            user_id:    telegramId,
+            snapshot:   JSON.stringify(snap),
+            session_id: sessionId || '',
+          }).catch(()=>{});
+          bleEngine._pendingSnapshot = null;
+        }
       }).catch(()=>{});
       secureSession.start(loadedLabels);
 

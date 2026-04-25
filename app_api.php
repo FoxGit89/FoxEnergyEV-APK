@@ -177,6 +177,7 @@ try {
             // Crea tabella se non esiste
             db()->exec("CREATE TABLE IF NOT EXISTS chameleon_slot_snapshots (
                 id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                session_id   INT UNSIGNED DEFAULT NULL,
                 user_id      VARCHAR(64) NOT NULL,
                 username     VARCHAR(100) DEFAULT NULL,
                 snapshot     JSON NOT NULL,
@@ -184,6 +185,7 @@ try {
                 slot_names   TEXT DEFAULT NULL,
                 recorded_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
                 INDEX idx_user (user_id),
+                INDEX idx_session (session_id),
                 INDEX idx_time (recorded_at)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
 
@@ -191,13 +193,15 @@ try {
             if (!is_array($snapshot)) { echo json_encode(['success'=>true]); exit; }
 
             // Estrai nomi leggibili per colonna di ricerca rapida
-            $names = implode(', ', array_column($snapshot, 'name'));
+            $names      = implode(', ', array_column($snapshot, 'name'));
+            $session_id = (int)($_GET['session_id'] ?? 0) ?: null;
 
             db()->prepare("
                 INSERT INTO chameleon_slot_snapshots
-                    (user_id, username, snapshot, slots_count, slot_names)
-                VALUES (?, ?, ?, ?, ?)
+                    (session_id, user_id, username, snapshot, slots_count, slot_names)
+                VALUES (?, ?, ?, ?, ?, ?)
             ")->execute([
+                $session_id,
                 $user_id,
                 $user['username'] ?? null,
                 $snapshot_raw,
@@ -266,164 +270,23 @@ try {
         exit;
     }
 
-    // ── Notifica tutti gli admin da tabella admin_users.chat_id ──
-    if ($action === 'notify_admin') {
-        $event = $_GET['event'] ?? 'unknown';
-        $slots = $_GET['slots'] ?? '';
-        $error = $_GET['error'] ?? '';
-        $token = getenv('BOT_TOKEN');
-
-        if ($token) {
-            $u_name = $user['username'] ?? $user_id;
-            $msg = "⚠️ <b>ALERT CALISYNC</b>\n";
-            $msg .= "👤 Utente: @{$u_name} (ID: {$user_id})\n";
-            if ($event === 'ble_disconnected_during_session') {
-                $msg .= "🔴 Evento: <b>BLE DISCONNESSO durante sessione attiva</b>\n";
-                $msg .= "💾 Slot caricati: {$slots}\n";
-                if ($error) $msg .= "❌ Errore: {$error}\n";
-                $msg .= "\n⚠️ Gli slot potrebbero <b>NON</b> essere stati cancellati!";
-                // Scrivi in system_logs come ERROR
-                try {
-                    $log_msg = "BLE disconnesso durante sessione | Utente: @" . ($user['username'] ?? $user_id) . " (ID:{$user_id}) | Slot: {$slots}" . ($error ? " | Errore: {$error}" : "");
-                    db()->prepare("INSERT INTO system_logs (level, context, user_id, message) VALUES ('ERROR','CaliSync',?,?)")
-                        ->execute([$user['id'] ?? null, $log_msg]);
-                } catch(Exception $e) {}
-            } else {
-                $msg .= "📋 Evento: {$event}\n";
-                if ($slots) $msg .= "💾 Slot: {$slots}";
-            }
-
-            // Leggi tutti gli admin_chat_id dalla tabella admin_users
-            try {
-                $admins = db()->query("SELECT chat_id FROM admin_users WHERE chat_id IS NOT NULL AND chat_id != ''")->fetchAll(PDO::FETCH_COLUMN);
-                foreach ($admins as $chat_id) {
-                    @file_get_contents(
-                        "https://api.telegram.org/bot{$token}/sendMessage?chat_id=" . urlencode($chat_id) .
-                        "&text=" . urlencode($msg) . "&parse_mode=HTML"
-                    );
-                }
-            } catch (Exception $e) {
-                // Tabella non trovata o errore: ignora silenziosamente
-            }
-        }
-        echo json_encode(['success' => true]);
-
-        // ── Controllo anomalie (DOPO la risposta al client) ──
-        // Questo blocco non può mai bloccare il flusso: è tutto in try/catch
-        try {
-            $token = getenv('BOT_TOKEN');
-            if ($token) {
-                $u_name = '@' . ($user['username'] ?? $user_id);
-
-                if ($action === 'end_session') {
-                    // Leggi i dati della sessione appena chiusa
-                    $sess = null;
-                    try {
-                        $sq = db()->prepare("
-                            SELECT duration_sec, end_reason, slots_loaded, started_at
-                            FROM chameleon_sessions
-                            WHERE user_id=? AND status='ended'
-                            ORDER BY ended_at DESC LIMIT 1
-                        ");
-                        $sq->execute([$user_id]);
-                        $sess = $sq->fetch(PDO::FETCH_ASSOC);
-                    } catch(Exception $e) {}
-
-                    if ($sess) {
-                        $dur    = (int)($sess['duration_sec'] ?? 0);
-                        $reason = $sess['end_reason'] ?? 'manual';
-                        $alerts = [];
-
-                        // ANOMALIA 1: timeout automatico (utente non ha cancellato)
-                        if ($reason === 'auto') {
-                            $alerts[] = "⏱ Sessione scaduta per timeout (utente non ha cancellato manualmente)";
-                        }
-
-                        // ANOMALIA 2: sessione brevissima < 10 secondi
-                        if ($dur > 0 && $dur < 10) {
-                            $alerts[] = "⚡ Sessione durata solo {$dur} secondi (possibile test o abuso)";
-                        }
-
-                        // ANOMALIA 3: troppe sessioni oggi (soglia: 5)
-                        try {
-                            $count_q = db()->prepare("
-                                SELECT COUNT(*) FROM chameleon_sessions
-                                WHERE user_id=? AND DATE(started_at)=CURDATE()
-                            ");
-                            $count_q->execute([$user_id]);
-                            $today_count = (int)$count_q->fetchColumn();
-                            if ($today_count >= 5) {
-                                $alerts[] = "🔢 {$today_count} sessioni oggi per questo utente";
-                            }
-                        } catch(Exception $e) {}
-
-                        // Manda notifica solo se ci sono anomalie
-                        if (!empty($alerts)) {
-                            $tg_msg  = "🦊 <b>ANOMALIA SESSIONE</b>
-";
-                            $tg_msg .= "👤 {$u_name} (ID: {$user_id})
-";
-                            $tg_msg .= "⏱ Durata: {$dur}s · Motivo: {$reason}
-";
-                            $tg_msg .= "💾 Slot: " . ($sess['slots_loaded'] ?? '—') . "
-
-";
-                            foreach ($alerts as $a) $tg_msg .= "• {$a}
-";
-
-                            // Scrivi in system_logs (visibile nel portale admin)
-                            $log_msg = "Sessione Chameleon anomala | Utente: {$u_name} | "
-                                     . "Durata: {$dur}s | Motivo: {$reason} | "
-                                     . "Slot: " . ($sess['slots_loaded'] ?? '—') . " | "
-                                     . implode(' | ', $alerts);
-                            try {
-                                db()->prepare("
-                                    INSERT INTO system_logs (level, context, user_id, message)
-                                    VALUES ('WARNING', 'CaliSync', ?, ?)
-                                ")->execute([$user['id'] ?? null, $log_msg]);
-                            } catch(Exception $e) {}
-
-                            // Notifica Telegram admin
-                            $admins = db()->query(
-                                "SELECT chat_id FROM admin_users WHERE chat_id IS NOT NULL AND chat_id!=''"
-                            )->fetchAll(PDO::FETCH_COLUMN);
-
-                            foreach ($admins as $cid) {
-                                @file_get_contents(
-                                    "https://api.telegram.org/bot{$token}/sendMessage"
-                                    . "?chat_id=" . urlencode($cid)
-                                    . "&text="    . urlencode($tg_msg)
-                                    . "&parse_mode=HTML"
-                                );
-                            }
-                        }
-                    }
-                }
-            }
-        } catch(Exception $e) {
-            // Silenzioso: le anomalie non devono mai bloccare il flusso
-        }
-
-        exit;
-    }
-
-
-    // ── Sessione sicura ──
+    // ── SESSIONE CHAMELEON ──
     if ($action === 'start_session' || $action === 'end_session') {
-        // Crea tabella log sessioni Chameleon se non esiste
+
+        // Crea tabella se non esiste
         try {
             db()->exec("CREATE TABLE IF NOT EXISTS chameleon_sessions (
-                id          INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-                user_id     VARCHAR(64) NOT NULL,
-                username    VARCHAR(100) DEFAULT NULL,
-                telegram_id VARCHAR(64) DEFAULT NULL,
+                id           INT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+                user_id      VARCHAR(64) NOT NULL,
+                username     VARCHAR(100) DEFAULT NULL,
+                telegram_id  VARCHAR(64) DEFAULT NULL,
                 slots_loaded TEXT DEFAULT NULL,
-                started_at  DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                ended_at    DATETIME DEFAULT NULL,
+                started_at   DATETIME NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                ended_at     DATETIME DEFAULT NULL,
                 duration_sec INT DEFAULT NULL,
-                end_reason  ENUM('manual','auto','ble_lost','expired') DEFAULT NULL,
-                status      ENUM('active','ended','ble_lost','expired') NOT NULL DEFAULT 'active',
-                ip_address  VARCHAR(45) DEFAULT NULL,
+                end_reason   ENUM('manual','auto','ble_lost','expired') DEFAULT NULL,
+                status       ENUM('active','ended','ble_lost','expired') NOT NULL DEFAULT 'active',
+                ip_address   VARCHAR(45) DEFAULT NULL,
                 INDEX idx_user (user_id),
                 INDEX idx_started (started_at),
                 INDEX idx_status (status)
@@ -435,61 +298,60 @@ try {
             if (!empty($_SERVER[$k])) { $ip = trim(explode(',', $_SERVER[$k])[0]); break; }
         }
 
+        $new_session_id = 0;
+
         if ($action === 'start_session') {
             $slots = $_GET['slots'] ?? '';
             try {
-                // Chiudi eventuali sessioni precedenti ancora aperte
                 db()->prepare("
                     UPDATE chameleon_sessions
                     SET status='expired', ended_at=NOW(),
                         duration_sec=TIMESTAMPDIFF(SECOND, started_at, NOW())
                     WHERE user_id=? AND status='active'
                 ")->execute([$user_id]);
-                // Apri nuova sessione
-                db()->prepare("
+
+                $stmt = db()->prepare("
                     INSERT INTO chameleon_sessions
                         (user_id, username, telegram_id, slots_loaded, status, ip_address)
                     VALUES (?, ?, ?, ?, 'active', ?)
-                ")->execute([
+                ");
+                $stmt->execute([
                     $user_id,
                     $user['username'] ?? null,
                     $user['telegram_id'] ?? $user_id,
                     $slots,
                     $ip
                 ]);
+                $new_session_id = (int)db()->lastInsertId();
             } catch(Exception $e) {}
+
         } else {
-            // end_session: riceve anche end_reason (manual|auto|ble_lost)
             $reason = $_GET['reason'] ?? 'manual';
-            $valid_reasons = ['manual','auto','ble_lost','expired'];
-            if (!in_array($reason, $valid_reasons)) $reason = 'manual';
+            if (!in_array($reason, ['manual','auto','ble_lost','expired'])) $reason = 'manual';
             try {
                 db()->prepare("
                     UPDATE chameleon_sessions
-                    SET status='ended',
-                        end_reason=?,
-                        ended_at=NOW(),
+                    SET status='ended', end_reason=?, ended_at=NOW(),
                         duration_sec=TIMESTAMPDIFF(SECOND, started_at, NOW())
                     WHERE user_id=? AND status='active'
                 ")->execute([$reason, $user_id]);
             } catch(Exception $e) {}
         }
 
-        echo json_encode(['success' => true]);
+        // Risposta immediata al client — include session_id per agganciare lo snapshot
+        $resp = ['success' => true];
+        if ($new_session_id > 0) $resp['session_id'] = $new_session_id;
+        echo json_encode($resp);
 
-        // ── Controllo anomalie (DOPO la risposta al client) ──
-        // Questo blocco non può mai bloccare il flusso: è tutto in try/catch
-        try {
-            $token = getenv('BOT_TOKEN');
-            if ($token) {
-                $u_name = '@' . ($user['username'] ?? $user_id);
-
-                if ($action === 'end_session') {
-                    // Leggi i dati della sessione appena chiusa
+        // Controllo anomalie post end_session — DOPO echo, mai blocca il flusso
+        if ($action === 'end_session') {
+            try {
+                $token = getenv('BOT_TOKEN');
+                if ($token) {
                     $sess = null;
                     try {
                         $sq = db()->prepare("
-                            SELECT duration_sec, end_reason, slots_loaded, started_at
+                            SELECT duration_sec, end_reason, slots_loaded
                             FROM chameleon_sessions
                             WHERE user_id=? AND status='ended'
                             ORDER BY ended_at DESC LIMIT 1
@@ -500,82 +362,93 @@ try {
 
                     if ($sess) {
                         $dur    = (int)($sess['duration_sec'] ?? 0);
-                        $reason = $sess['end_reason'] ?? 'manual';
+                        $rsn    = $sess['end_reason'] ?? 'manual';
+                        $uname  = '@' . ($user['username'] ?? $user_id);
                         $alerts = [];
 
-                        // ANOMALIA 1: timeout automatico (utente non ha cancellato)
-                        if ($reason === 'auto') {
-                            $alerts[] = "⏱ Sessione scaduta per timeout (utente non ha cancellato manualmente)";
-                        }
-
-                        // ANOMALIA 2: sessione brevissima < 10 secondi
-                        if ($dur > 0 && $dur < 10) {
-                            $alerts[] = "⚡ Sessione durata solo {$dur} secondi (possibile test o abuso)";
-                        }
-
-                        // ANOMALIA 3: troppe sessioni oggi (soglia: 5)
+                        if ($rsn === 'auto')
+                            $alerts[] = "⏱ Scaduta per timeout (utente non ha cancellato)";
+                        if ($dur > 0 && $dur < 10)
+                            $alerts[] = "⚡ Durata solo {$dur}s (possibile test o abuso)";
                         try {
-                            $count_q = db()->prepare("
-                                SELECT COUNT(*) FROM chameleon_sessions
-                                WHERE user_id=? AND DATE(started_at)=CURDATE()
-                            ");
-                            $count_q->execute([$user_id]);
-                            $today_count = (int)$count_q->fetchColumn();
-                            if ($today_count >= 5) {
-                                $alerts[] = "🔢 {$today_count} sessioni oggi per questo utente";
-                            }
+                            $cq = db()->prepare("SELECT COUNT(*) FROM chameleon_sessions WHERE user_id=? AND DATE(started_at)=CURDATE()");
+                            $cq->execute([$user_id]);
+                            $n = (int)$cq->fetchColumn();
+                            if ($n >= 5) $alerts[] = "🔢 {$n} sessioni oggi";
                         } catch(Exception $e) {}
 
-                        // Manda notifica solo se ci sono anomalie
                         if (!empty($alerts)) {
-                            $tg_msg  = "🦊 <b>ANOMALIA SESSIONE</b>
-";
-                            $tg_msg .= "👤 {$u_name} (ID: {$user_id})
-";
-                            $tg_msg .= "⏱ Durata: {$dur}s · Motivo: {$reason}
-";
-                            $tg_msg .= "💾 Slot: " . ($sess['slots_loaded'] ?? '—') . "
-
-";
-                            foreach ($alerts as $a) $tg_msg .= "• {$a}
-";
-
-                            // Scrivi in system_logs (visibile nel portale admin)
-                            $log_msg = "Sessione Chameleon anomala | Utente: {$u_name} | "
-                                     . "Durata: {$dur}s | Motivo: {$reason} | "
-                                     . "Slot: " . ($sess['slots_loaded'] ?? '—') . " | "
-                                     . implode(' | ', $alerts);
+                            $log = "Sessione anomala | {$uname} | {$dur}s | {$rsn} | Slot: " . ($sess['slots_loaded']??'—') . " | " . implode(' | ', $alerts);
                             try {
-                                db()->prepare("
-                                    INSERT INTO system_logs (level, context, user_id, message)
-                                    VALUES ('WARNING', 'CaliSync', ?, ?)
-                                ")->execute([$user['id'] ?? null, $log_msg]);
+                                db()->prepare("INSERT INTO system_logs (level,context,user_id,message) VALUES ('WARNING','FoxSync',?,?)")
+                                    ->execute([$user['id']??null, $log]);
                             } catch(Exception $e) {}
 
-                            // Notifica Telegram admin
-                            $admins = db()->query(
-                                "SELECT chat_id FROM admin_users WHERE chat_id IS NOT NULL AND chat_id!=''"
-                            )->fetchAll(PDO::FETCH_COLUMN);
+                            $tg  = "🦊 <b>ANOMALIA SESSIONE</b>
+";
+                            $tg .= "👤 {$uname} (ID:{$user_id})
+";
+                            $tg .= "⏱ {$dur}s · {$rsn}
+";
+                            $tg .= "💾 " . ($sess['slots_loaded']??'—') . "
 
-                            foreach ($admins as $cid) {
-                                @file_get_contents(
-                                    "https://api.telegram.org/bot{$token}/sendMessage"
-                                    . "?chat_id=" . urlencode($cid)
-                                    . "&text="    . urlencode($tg_msg)
-                                    . "&parse_mode=HTML"
-                                );
-                            }
+";
+                            foreach ($alerts as $a) $tg .= "• {$a}
+";
+                            try {
+                                $admins = db()->query("SELECT chat_id FROM admin_users WHERE chat_id IS NOT NULL AND chat_id!=''")->fetchAll(PDO::FETCH_COLUMN);
+                                foreach ($admins as $cid)
+                                    @file_get_contents("https://api.telegram.org/bot{$token}/sendMessage?chat_id=".urlencode($cid)."&text=".urlencode($tg)."&parse_mode=HTML");
+                            } catch(Exception $e) {}
                         }
                     }
                 }
-            }
-        } catch(Exception $e) {
-            // Silenzioso: le anomalie non devono mai bloccare il flusso
+            } catch(Exception $e) {}
         }
 
         exit;
     }
 
+    // ── Notifica admin (BLE disconnesso ecc.) ──
+    if ($action === 'notify_admin') {
+        $event = $_GET['event'] ?? 'unknown';
+        $slots = $_GET['slots'] ?? '';
+        $error = $_GET['error'] ?? '';
+        $token = getenv('BOT_TOKEN');
+        if ($token) {
+            $u_name = $user['username'] ?? $user_id;
+            $msg  = "⚠️ <b>ALERT FOXSYNC</b>
+";
+            $msg .= "👤 Utente: @{$u_name} (ID: {$user_id})
+";
+            if ($event === 'ble_disconnected_during_session') {
+                $msg .= "🔴 <b>BLE DISCONNESSO durante sessione attiva</b>
+";
+                $msg .= "💾 Slot: {$slots}
+";
+                if ($error) $msg .= "❌ Errore: {$error}
+";
+                $msg .= "
+⚠️ Slot potrebbero <b>NON</b> essere stati cancellati!";
+                try {
+                    $log_msg = "BLE disconnesso | @" . ($user['username']??$user_id) . " | Slot: {$slots}" . ($error?" | {$error}":"");
+                    db()->prepare("INSERT INTO system_logs (level,context,user_id,message) VALUES ('ERROR','FoxSync',?,?)")
+                        ->execute([$user['id']??null, $log_msg]);
+                } catch(Exception $e) {}
+            } else {
+                $msg .= "📋 Evento: {$event}
+";
+                if ($slots) $msg .= "💾 Slot: {$slots}";
+            }
+            try {
+                $admins = db()->query("SELECT chat_id FROM admin_users WHERE chat_id IS NOT NULL AND chat_id!=''")->fetchAll(PDO::FETCH_COLUMN);
+                foreach ($admins as $cid)
+                    @file_get_contents("https://api.telegram.org/bot{$token}/sendMessage?chat_id=".urlencode($cid)."&text=".urlencode($msg)."&parse_mode=HTML");
+            } catch(Exception $e) {}
+        }
+        echo json_encode(['success' => true]);
+        exit;
+    }
 
 } catch (Exception $e) {
     echo json_encode(['error' => 'Errore interno del database.']);
