@@ -1,10 +1,10 @@
-const CACHE_NAME = 'foxsync-v48';
+const CACHE_NAME = 'foxsync-v49';
 const ASSETS = [
   './',
-  './index.html?v=48',
-  './style.css?v=48',
-  './app.js?v=48',
-  './manifest.json?v=48',
+  './index.html?v=49',
+  './style.css?v=49',
+  './app.js?v=49',
+  './manifest.json?v=49',
   'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/index.global.js',
   'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/Crypto1.global.js',
   'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/plugin/WebbleAdapter.global.js'

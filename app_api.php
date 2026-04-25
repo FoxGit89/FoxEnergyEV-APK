@@ -368,15 +368,16 @@ try {
                     } catch(Exception $e) {}
 
                     if ($sess) {
-                        $dur    = (int)($sess['duration_sec'] ?? 0);
-                        $rsn    = $sess['end_reason'] ?? 'manual';
-                        $uname  = '@' . ($user['username'] ?? $user_id);
+                        $dur   = (int)($sess['duration_sec'] ?? 0);
+                        $rsn   = $sess['end_reason'] ?? 'manual';
+                        $uname = '@' . ($user['username'] ?? $user_id);
                         $alerts = [];
 
-                        if ($rsn === 'auto')
-                            $alerts[] = "⏱ Scaduta per timeout (utente non ha cancellato)";
+                        // ANOMALIA 1: sessione < 10s (sospetta in ogni caso)
                         if ($dur > 0 && $dur < 10)
-                            $alerts[] = "⚡ Durata solo {$dur}s (possibile test o abuso)";
+                            $alerts[] = "⚡ Sessione durata solo {$dur}s";
+
+                        // ANOMALIA 2: 5+ sessioni oggi
                         try {
                             $cq = db()->prepare("SELECT COUNT(*) FROM chameleon_sessions WHERE user_id=? AND DATE(started_at)=CURDATE()");
                             $cq->execute([$user_id]);
@@ -384,28 +385,50 @@ try {
                             if ($n >= 5) $alerts[] = "🔢 {$n} sessioni oggi";
                         } catch(Exception $e) {}
 
+                        // NOTA: 'auto' (timer 60s) NON è anomalia — comportamento normale atteso
+
                         if (!empty($alerts)) {
-                            $log = "Sessione anomala | {$uname} | {$dur}s | {$rsn} | Slot: " . ($sess['slots_loaded']??'—') . " | " . implode(' | ', $alerts);
+                            // Log portale admin
+                            $log = "Utilizzo anomalo | {$uname} | {$dur}s | motivo:{$rsn} | Slot: " . ($sess['slots_loaded']??'—') . " | " . implode(' | ', $alerts);
                             try {
                                 db()->prepare("INSERT INTO system_logs (level,context,user_id,message) VALUES ('WARNING','FoxSync',?,?)")
                                     ->execute([$user['id']??null, $log]);
                             } catch(Exception $e) {}
 
-                            $tg  = "🦊 <b>ANOMALIA SESSIONE</b>
+                            // Notifica admin Telegram
+                            $tg_admin  = "🦊 <b>ANOMALIA FOXSYNC</b>
 ";
-                            $tg .= "👤 {$uname} (ID:{$user_id})
+                            $tg_admin .= "👤 {$uname} (ID:{$user_id})
 ";
-                            $tg .= "⏱ {$dur}s · {$rsn}
+                            $tg_admin .= "⏱ Durata: {$dur}s · Motivo: {$rsn}
 ";
-                            $tg .= "💾 " . ($sess['slots_loaded']??'—') . "
+                            $tg_admin .= "💾 Slot: " . ($sess['slots_loaded']??'—') . "
 
 ";
-                            foreach ($alerts as $a) $tg .= "• {$a}
+                            foreach ($alerts as $a) $tg_admin .= "• {$a}
 ";
                             try {
                                 $admins = db()->query("SELECT chat_id FROM admin_users WHERE chat_id IS NOT NULL AND chat_id!=''")->fetchAll(PDO::FETCH_COLUMN);
                                 foreach ($admins as $cid)
-                                    @file_get_contents("https://api.telegram.org/bot{$token}/sendMessage?chat_id=".urlencode($cid)."&text=".urlencode($tg)."&parse_mode=HTML");
+                                    @file_get_contents("https://api.telegram.org/bot{$token}/sendMessage?chat_id=".urlencode($cid)."&text=".urlencode($tg_admin)."&parse_mode=HTML");
+                            } catch(Exception $e) {}
+
+                            // Notifica utente Telegram
+                            $tg_user  = "⚠️ <b>FoxSync Security Alert</b>
+
+";
+                            $tg_user .= "È stato rilevato un utilizzo anomalo del tuo Chameleon Ultra.
+
+";
+                            $tg_user .= "I log di sessione verranno verificati dagli amministratori.
+";
+                            $tg_user .= "Attendi un contatto da parte del team Fox Energy a riguardo.
+
+";
+                            $tg_user .= "<i>Se ritieni si tratti di un errore, contatta il supporto.</i>";
+                            try {
+                                if (!empty($user['telegram_id']))
+                                    @file_get_contents("https://api.telegram.org/bot{$token}/sendMessage?chat_id=".urlencode($user['telegram_id'])."&text=".urlencode($tg_user)."&parse_mode=HTML");
                             } catch(Exception $e) {}
                         }
                     }

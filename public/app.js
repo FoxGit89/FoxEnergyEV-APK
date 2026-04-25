@@ -564,7 +564,12 @@ const secureSession = {
     n.textContent=rem; n.className='session-countdown-num'+(urgent?' urgent':'');
     if(ring){ring.style.strokeDashoffset=326.73*(1-rem/SESSION_TIMEOUT_SEC);ring.className='session-ring-fill'+(urgent?' urgent':'');}
     if(bar&&secs){if(urgent&&rem>0){bar.classList.remove('hidden');secs.textContent=rem;}else bar.classList.add('hidden');}
-    if(rem<=3&&rem>0&&navigator.vibrate)navigator.vibrate(100);
+    // Vibrazione progressiva negli ultimi 10 secondi
+    if(navigator.vibrate && rem>0) {
+      if(rem<=3)       navigator.vibrate(200);        // ultimi 3s: vibrazione lunga
+      else if(rem<=5)  navigator.vibrate([100,50,100]); // 4-5s: doppia
+      else if(rem<=10 && rem%2===0) navigator.vibrate(50); // 6-10s: ogni 2s leggera
+    }
   },
 
   _updateRing(r){
