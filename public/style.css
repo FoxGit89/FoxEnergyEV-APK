@@ -666,7 +666,7 @@ input {
 }
 
 /* ==========================================
-   Dashboard action bar
+   Tab bar + bottom bar
    ========================================== */
 .bottom-bar {
   flex-shrink: 0;
@@ -675,731 +675,119 @@ input {
 }
 .tab-bar {
   display: flex;
-  gap: 0;
   padding: 6px 0 max(16px, env(safe-area-inset-bottom));
 }
 .tab-btn {
-  flex: 1;
-  background: transparent;
-  border: none;
+  flex: 1; background: transparent; border: none;
   color: rgba(255,255,255,0.5);
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 2px;
-  padding: 6px 4px;
-  cursor: pointer;
-  position: relative;
-  transition: color 0.2s;
+  display: flex; flex-direction: column; align-items: center; gap: 2px;
+  padding: 6px 4px; cursor: pointer; position: relative; transition: color 0.2s;
 }
 .tab-btn:active { color: var(--primary-orange); }
 .tab-icon  { font-size: 20px; }
 .tab-label { font-size: 10px; font-weight: 600; letter-spacing: 0.3px; }
 .tab-badge {
-  position: absolute;
-  top: 2px; right: calc(50% - 18px);
-  background: #FF5252;
-  color: white;
-  font-size: 9px;
-  font-weight: 900;
-  min-width: 14px;
-  height: 14px;
-  border-radius: 7px;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  padding: 0 3px;
+  position: absolute; top: 2px; right: calc(50% - 18px);
+  background: #FF5252; color: white; font-size: 9px; font-weight: 900;
+  min-width: 14px; height: 14px; border-radius: 7px;
+  display: flex; align-items: center; justify-content: center; padding: 0 3px;
 }
-.dash-premium-expires {
-  font-size: 11px;
-  color: rgba(255,255,255,0.7);
-  text-align: center;
-  padding: 6px 0 2px;
-  font-style: italic;
-}
+/* Dashboard no-scroll */
+#dashboard-screen { display:flex; flex-direction:column; height:100vh; overflow:hidden; }
+#dashboard-screen .app-header { flex-shrink:0; }
+#dashboard-screen .container { flex:1; overflow:hidden; padding:10px 0 0; display:flex; flex-direction:column; }
+#dashboard-screen .bottom-bar { flex-shrink:0; }
 
-/* ==========================================
-   Slot picker: operatori e badge
-   ========================================== */
-.slot-operators {
-  font-size: 11px;
-  color: var(--text-muted);
-  margin-top: 3px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.slot-promo-badge {
-  display: inline-block;
-  background: #FF9800;
-  color: white;
-  font-size: 9px;
-  font-weight: 900;
-  padding: 1px 5px;
-  border-radius: 4px;
-  margin-left: 6px;
-  vertical-align: middle;
-  letter-spacing: 0.5px;
-}
-.slot-susp-badge {
-  display: inline-block;
-  background: rgba(255,82,82,0.2);
-  color: #FF5252;
-  font-size: 9px;
-  font-weight: 700;
-  padding: 1px 5px;
-  border-radius: 4px;
-  margin-left: 6px;
-  vertical-align: middle;
-}
-
-/* ==========================================
-   Schermate comuni (scroll)
-   ========================================== */
+/* Scroll container schermate secondarie */
 .scroll-container {
-  height: calc(100vh - 60px);
-  overflow-y: auto;
-  padding: 16px;
-  -webkit-overflow-scrolling: touch;
+  height: calc(100vh - 60px); overflow-y: auto;
+  padding: 16px; -webkit-overflow-scrolling: touch;
 }
-.loading-spinner {
-  display: flex;
-  justify-content: center;
-  padding: 60px 0;
-}
-.empty-state {
-  text-align: center;
-  padding: 60px 20px;
-  color: var(--text-muted);
-  font-size: 15px;
-  line-height: 2;
-}
-
-/* ==========================================
-   Storico
-   ========================================== */
-.history-section-title {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-muted);
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  padding: 12px 4px 8px;
-}
-.history-card {
-  background: var(--bg-card);
-  border-radius: 14px;
-  padding: 14px 16px;
-  margin-bottom: 8px;
-  display: flex;
-  justify-content: space-between;
-  align-items: flex-start;
-  gap: 12px;
-}
-.history-left { flex: 1; min-width: 0; }
-.history-right { text-align: right; flex-shrink: 0; }
-.history-kwh   { font-size: 16px; font-weight: 900; margin-bottom: 2px; }
-.history-desc  { font-size: 13px; color: var(--text-muted); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-.history-op    { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-.history-eur   { font-size: 15px; font-weight: 700; margin-bottom: 3px; }
-.history-status{ font-size: 11px; color: var(--text-muted); margin-bottom: 2px; }
-.history-date  { font-size: 11px; color: var(--text-muted); }
-
-/* ==========================================
-   Broadcasts
-   ========================================== */
-.bc-card {
-  background: var(--bg-card);
-  border-radius: 14px;
-  padding: 14px 16px;
-  margin-bottom: 10px;
-  display: flex;
-  gap: 12px;
-  border-left: 3px solid var(--primary-orange);
-}
-.bc-icon    { font-size: 22px; flex-shrink: 0; }
-.bc-body    { flex: 1; min-width: 0; }
-.bc-subject { font-size: 13px; font-weight: 700; margin-bottom: 4px; }
-.bc-text    { font-size: 14px; line-height: 1.5; color: rgba(255,255,255,0.85); white-space: pre-wrap; }
-.bc-date    { font-size: 11px; color: var(--text-muted); margin-top: 6px; }
+.loading-spinner { display:flex; justify-content:center; padding:60px 0; }
+.empty-state { text-align:center; padding:60px 20px; color:var(--text-muted); font-size:15px; line-height:2; }
 
 /* ==========================================
    Profilo
    ========================================== */
-.profile-header {
-  text-align: center;
-  padding: 20px 0 16px;
-}
+.profile-header { text-align:center; padding:20px 0 16px; }
 .profile-avatar {
-  width: 72px; height: 72px;
-  border-radius: 50%;
-  background: linear-gradient(135deg, var(--primary-orange-dark), var(--primary-orange));
-  color: white;
-  font-size: 32px;
-  font-weight: 900;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  margin: 0 auto 12px;
-  box-shadow: 0 4px 12px rgba(255,152,0,0.4);
+  width:72px; height:72px; border-radius:50%;
+  background:linear-gradient(135deg,var(--primary-orange-dark),var(--primary-orange));
+  color:white; font-size:32px; font-weight:900;
+  display:flex; align-items:center; justify-content:center;
+  margin:0 auto 12px; box-shadow:0 4px 12px rgba(255,152,0,0.4);
 }
-.profile-name     { font-size: 20px; font-weight: 900; }
-.profile-username { font-size: 14px; color: var(--text-muted); margin-top: 2px; }
-.profile-since    { font-size: 12px; color: var(--text-muted); margin-top: 4px; }
-
-.profile-badges {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
-  justify-content: center;
-  margin-bottom: 20px;
-}
-.badge-premium   { background: linear-gradient(90deg,#C59115,#E5B942); color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 700; }
-.badge-level     { background: rgba(255,255,255,0.1); color: white; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
-.badge-overdraft { background: rgba(68,138,255,0.2); color: #448AFF; padding: 4px 12px; border-radius: 20px; font-size: 12px; font-weight: 600; }
-.badge-info      { background: rgba(255,255,255,0.07); color: var(--text-muted); padding: 4px 12px; border-radius: 20px; font-size: 11px; }
-
-.profile-stats-row {
-  display: flex;
-  gap: 10px;
-  margin-bottom: 20px;
-}
-.profile-stat {
-  flex: 1;
-  background: var(--bg-card);
-  border-radius: 14px;
-  padding: 14px 10px;
-  text-align: center;
-}
-.profile-stat-val { font-size: 20px; font-weight: 900; }
-.profile-stat-lbl { font-size: 11px; color: var(--text-muted); margin-top: 3px; }
-
-.profile-section-title {
-  font-size: 12px;
-  font-weight: 700;
-  color: var(--text-muted);
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  margin: 16px 0 8px;
-}
-.profile-lifetime { background: var(--bg-card); border-radius: 14px; padding: 4px 0; margin-bottom: 16px; }
-.lifetime-item {
-  display: flex;
-  justify-content: space-between;
-  padding: 12px 16px;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
-}
-.lifetime-item:last-child { border-bottom: none; }
-.lifetime-lbl { color: var(--text-muted); font-size: 14px; }
-.lifetime-val { font-weight: 700; font-size: 14px; }
-
-.profile-tariffe { display: flex; flex-direction: column; gap: 8px; margin-bottom: 16px; }
-.tariffa-card {
-  background: var(--bg-card);
-  border-radius: 12px;
-  padding: 12px 16px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-}
-.tariffa-price      { font-size: 18px; font-weight: 900; color: var(--primary-orange); flex-shrink: 0; }
-.tariffa-price span { font-size: 12px; color: var(--text-muted); font-weight: 400; }
-.tariffa-desc       { flex: 1; font-size: 13px; }
-.tariffa-orario     { font-size: 11px; color: var(--text-muted); }
-
-/* Sessione sicura (dalla v29) */
-#session-screen { background: linear-gradient(160deg, #0D0D0D 0%, #1a0a00 100%); }
-#wipe-screen    { background: #0D0D0D; }
-.session-ring-wrap  { position:relative;width:160px;height:160px;margin-bottom:28px; }
-.session-ring       { width:160px;height:160px;transform:rotate(-90deg); }
-.session-ring-bg    { fill:none;stroke:rgba(255,152,0,0.15);stroke-width:8; }
-.session-ring-fill  { fill:none;stroke:#FF9800;stroke-width:8;stroke-linecap:round;transition:stroke-dashoffset 1s linear,stroke 0.5s; }
-.session-ring-fill.urgent { stroke:#FF5252; }
-.session-ring-inner { position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);text-align:center; }
-.session-countdown-num        { font-size:44px;font-weight:900;color:#FF9800;line-height:1;transition:color 0.5s; }
-.session-countdown-num.urgent { color:#FF5252; }
-.session-countdown-label      { font-size:12px;color:rgba(255,255,255,0.54);letter-spacing:1px;margin-top:4px; }
-.session-warning-bar { background:rgba(255,82,82,0.15);border:1px solid rgba(255,82,82,0.4);border-radius:12px;padding:10px 20px;color:#FF5252;font-size:14px;font-weight:700;margin-top:10px;width:100%;text-align:center; }
-.btn-danger          { width:100%;padding:16px;background-color:#B71C1C;color:white;border-radius:15px;font-size:16px;font-weight:bold;letter-spacing:1px;box-shadow:0 4px 6px rgba(183,28,28,0.4);transition:opacity 0.2s;border:none;cursor:pointer; }
-.btn-danger:active   { opacity:0.8; }
-.btn-danger:disabled { background-color:#2A2A2A;color:rgba(255,255,255,0.38);box-shadow:none;cursor:not-allowed; }
-.btn-connect-main    { font-size:18px!important;padding:22px!important;border-radius:20px!important;letter-spacing:2px!important;box-shadow:0 6px 20px rgba(230,81,0,0.4)!important; }
-.slot-status-row     { display:flex;align-items:center;gap:12px;padding:10px 16px;border-radius:12px;margin-bottom:6px;background:var(--bg-card);text-align:left; }
-.slot-status-row.active { border-left:3px solid var(--primary-orange); }
-.slot-status-row.empty  { opacity:0.4; }
-.slot-status-num { width:28px;height:28px;border-radius:50%;background:rgba(255,152,0,0.15);color:var(--primary-orange);display:flex;align-items:center;justify-content:center;font-weight:900;font-size:13px;flex-shrink:0; }
-.slot-status-row.empty .slot-status-num { background:rgba(255,255,255,0.08);color:var(--text-muted); }
-
-/* ==========================================
-   Dashboard card v30 — layout fluido
-   ========================================== */
-.dash-level-badge {
-  display: inline-flex;
-  align-items: center;
-  background: rgba(255,255,255,0.15);
-  backdrop-filter: blur(4px);
-  border-radius: 20px;
-  padding: 4px 14px;
-  font-size: 12px;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  color: white;
-}
-.dashboard-card.premium .dash-level-badge {
-  background: rgba(255,255,255,0.2);
-}
-.dash-balance-wrap {
-  padding: 10px 0 6px;
-}
-.dash-balance-label {
-  font-size: 11px;
-  font-weight: 600;
-  color: rgba(255,255,255,0.65);
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  margin-bottom: 4px;
-}
-.dash-balance {
-  font-size: 48px;
-  font-weight: 900;
-  line-height: 1;
-  letter-spacing: -1px;
-}
-.dash-balance-unit {
-  font-size: 22px;
-  font-weight: 600;
-  opacity: 0.8;
-}
-.dash-balance-currency {
-  margin-right: 4px;
-}
-.dash-footer {
-  display: flex;
-  align-items: center;
-  gap: 0;
-}
-.dash-karma-wrap {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  flex-shrink: 0;
-  padding-right: 16px;
-  border-right: 1px solid rgba(255,255,255,0.2);
-  margin-right: 16px;
-}
-.dash-karma-icon { font-size: 20px; }
-.dash-karma-val  { font-size: 20px; font-weight: 900; line-height: 1; }
-.dash-karma-lbl  { font-size: 10px; color: rgba(255,255,255,0.65); margin-top: 1px; }
-.dash-tariff-wrap { flex: 1; min-width: 0; }
-.dash-tariff-lbl  { font-size: 10px; color: rgba(255,255,255,0.65); margin-bottom: 4px; text-transform: uppercase; letter-spacing: 0.5px; }
-.dash-tariff-val  { display: flex; flex-wrap: wrap; gap: 4px; }
-
-/* Tariffe come chip */
-.tariff-chip {
-  display: inline-flex;
-  align-items: baseline;
-  gap: 3px;
-  background: rgba(255,255,255,0.15);
-  border-radius: 8px;
-  padding: 2px 8px;
-  font-size: 13px;
-  font-weight: 700;
-  white-space: nowrap;
-}
-.tariff-chip small { font-size: 10px; font-weight: 400; opacity: 0.8; }
-.tariff-price {
-  font-size: 15px;
-  font-weight: 900;
-}
-.tariff-price small { font-size: 10px; font-weight: 400; opacity: 0.8; margin-left: 1px; }
-.tariff-desc {
-  font-size: 10px;
-  opacity: 0.75;
-  margin-left: 4px;
-}
-
-/* ==========================================
-   Premium card nel profilo
-   ========================================== */
-.premium-card {
-  background: linear-gradient(135deg, #C59115, #E5B942);
-  border-radius: 16px;
-  padding: 16px;
-  margin-bottom: 16px;
-  color: white;
-}
-.premium-card-top {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 10px;
-}
-.premium-star { font-size: 28px; flex-shrink: 0; }
-.premium-title { font-size: 11px; font-weight: 700; letter-spacing: 1px; opacity: 0.85; text-transform: uppercase; }
-.premium-level { font-size: 17px; font-weight: 900; }
-.premium-days {
-  margin-left: auto;
-  text-align: center;
-  background: rgba(0,0,0,0.15);
-  border-radius: 10px;
-  padding: 6px 12px;
-  flex-shrink: 0;
-}
-.premium-days-num { font-size: 22px; font-weight: 900; line-height: 1; }
-.premium-days-lbl { font-size: 10px; opacity: 0.8; }
-.premium-expiry   { font-size: 12px; opacity: 0.85; }
-.prem-expiry-warn   { color: #FFF3CD !important; }
-.prem-expiry-urgent { color: #FFCCCC !important; }
-.premium-days.prem-expiry-warn   { background: rgba(255,150,0,0.3); }
-.premium-days.prem-expiry-urgent { background: rgba(255,50,50,0.4); }
-
-/* Avatar premium con glow */
-.profile-avatar.premium {
-  background: linear-gradient(135deg, #C59115, #E5B942);
-  box-shadow: 0 4px 20px rgba(229,185,66,0.5);
-}
-
-/* Badge livello per utenti non-premium */
+.profile-avatar.premium { background:linear-gradient(135deg,#C59115,#E5B942); box-shadow:0 4px 20px rgba(229,185,66,0.5); }
+.profile-name     { font-size:20px; font-weight:900; }
+.profile-username { font-size:14px; color:var(--text-muted); margin-top:2px; }
+.profile-since    { font-size:12px; color:var(--text-muted); margin-top:4px; }
 .profile-level-badge {
-  text-align: center;
-  background: rgba(255,255,255,0.08);
-  border-radius: 20px;
-  padding: 6px 20px;
-  font-size: 13px;
-  font-weight: 700;
-  color: rgba(255,255,255,0.8);
-  margin: 0 auto 16px;
-  display: inline-block;
-  width: auto;
+  text-align:center; background:rgba(255,255,255,0.08); border-radius:20px;
+  padding:6px 20px; font-size:13px; font-weight:700; color:rgba(255,255,255,0.8);
+  margin:0 auto 16px; display:inline-block;
 }
+.premium-card { background:linear-gradient(135deg,#C59115,#E5B942); border-radius:16px; padding:16px; margin-bottom:16px; color:white; }
+.premium-card-top { display:flex; align-items:center; gap:12px; margin-bottom:10px; }
+.premium-star  { font-size:28px; flex-shrink:0; }
+.premium-title { font-size:11px; font-weight:700; letter-spacing:1px; opacity:0.85; text-transform:uppercase; }
+.premium-level { font-size:17px; font-weight:900; }
+.premium-days  { margin-left:auto; text-align:center; background:rgba(0,0,0,0.15); border-radius:10px; padding:6px 12px; flex-shrink:0; }
+.premium-days-num { font-size:22px; font-weight:900; line-height:1; }
+.premium-days-lbl { font-size:10px; opacity:0.8; }
+.premium-expiry   { font-size:12px; opacity:0.85; }
+.prem-expiry-warn   { color:#FFF3CD!important; }
+.prem-expiry-urgent { color:#FFCCCC!important; }
+.profile-stats-row { display:flex; gap:10px; margin-bottom:20px; }
+.profile-stat { flex:1; background:var(--bg-card); border-radius:14px; padding:14px 10px; text-align:center; }
+.profile-stat-val { font-size:20px; font-weight:900; }
+.profile-stat-lbl { font-size:11px; color:var(--text-muted); margin-top:3px; }
+.profile-section-title { font-size:12px; font-weight:700; color:var(--text-muted); letter-spacing:1px; text-transform:uppercase; margin:16px 0 8px; }
+.profile-lifetime { background:var(--bg-card); border-radius:14px; padding:4px 0; margin-bottom:16px; }
+.lifetime-item { display:flex; justify-content:space-between; padding:12px 16px; border-bottom:1px solid rgba(255,255,255,0.05); }
+.lifetime-item:last-child { border-bottom:none; }
+.lifetime-lbl { color:var(--text-muted); font-size:14px; }
+.lifetime-val { font-weight:700; font-size:14px; }
+.profile-tariffe { display:flex; flex-direction:column; gap:8px; margin-bottom:16px; }
+.tariffa-card { background:var(--bg-card); border-radius:12px; padding:12px 16px; display:flex; align-items:center; gap:12px; }
+.tariffa-price { font-size:18px; font-weight:900; color:var(--primary-orange); flex-shrink:0; }
+.tariffa-price span { font-size:12px; color:var(--text-muted); font-weight:400; }
+.tariffa-info { flex:1; min-width:0; }
+.tariffa-desc { font-size:13px; font-weight:600; }
+.tariffa-orario { font-size:11px; color:var(--text-muted); margin-top:2px; }
 
 /* ==========================================
-   Progress verso prossimo livello
+   Storico tx cards
    ========================================== */
-.level-progress-card {
-  background: var(--bg-card);
-  border-radius: 14px;
-  padding: 14px 16px;
-  margin-bottom: 16px;
-}
-.level-progress-header {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  margin-bottom: 10px;
-  font-size: 14px;
-}
-.level-cur  { font-weight: 700; color: var(--primary-orange); }
-.level-arrow{ color: var(--text-muted); }
-.level-next { font-weight: 700; color: rgba(255,255,255,0.6); }
-.level-progress-bar-bg {
-  height: 8px;
-  background: rgba(255,255,255,0.1);
-  border-radius: 4px;
-  overflow: hidden;
-  margin-bottom: 8px;
-}
-.level-progress-bar-fill {
-  height: 100%;
-  background: linear-gradient(90deg, var(--primary-orange-dark), var(--primary-orange));
-  border-radius: 4px;
-  transition: width 0.6s ease;
-}
-.level-progress-info {
-  display: flex;
-  justify-content: space-between;
-  font-size: 11px;
-  color: var(--text-muted);
-}
+.history-section-title { font-size:12px; font-weight:700; color:var(--text-muted); letter-spacing:1px; text-transform:uppercase; padding:12px 4px 8px; }
+.tx-card { background:var(--bg-card); border-radius:14px; margin-bottom:8px; display:flex; overflow:hidden; }
+.tx-status-bar { width:4px; flex-shrink:0; }
+.s-confirmed { background:#4CAF50; } .s-pending { background:#FF9800; }
+.s-progress  { background:#448AFF; } .s-rejected { background:#FF5252; }
+.tx-body  { flex:1; padding:12px 14px; min-width:0; }
+.tx-top   { display:flex; justify-content:space-between; align-items:baseline; margin-bottom:6px; }
+.tx-kwh   { font-size:18px; font-weight:900; }
+.tx-kwh span { font-size:12px; font-weight:400; opacity:0.7; }
+.tx-eur   { font-size:16px; font-weight:700; color:var(--primary-orange); }
+.tx-details { display:flex; flex-wrap:wrap; gap:4px; margin-bottom:6px; }
+.tx-tag   { font-size:11px; padding:2px 7px; border-radius:6px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis; max-width:160px; }
+.tag-slot { background:rgba(68,138,255,0.15); color:#448AFF; }
+.tag-op   { background:rgba(76,175,80,0.15);  color:#4CAF50; }
+.tag-svc  { background:rgba(255,152,0,0.15);  color:#FF9800; }
+.tx-note  { font-size:12px; color:var(--text-muted); margin-bottom:6px; font-style:italic; }
+.tx-footer { display:flex; justify-content:space-between; align-items:center; }
+.tx-status-badge { font-size:11px; font-weight:700; padding:2px 8px; border-radius:6px; }
+.tx-status-badge.s-confirmed { background:rgba(76,175,80,0.15);  color:#4CAF50; }
+.tx-status-badge.s-pending   { background:rgba(255,152,0,0.15);  color:#FF9800; }
+.tx-status-badge.s-progress  { background:rgba(68,138,255,0.15); color:#448AFF; }
+.tx-status-badge.s-rejected  { background:rgba(255,82,82,0.15);  color:#FF5252; }
+.tx-date  { font-size:11px; color:var(--text-muted); }
 
 /* ==========================================
-   Cashback
+   Broadcasts
    ========================================== */
-.cashback-list {
-  background: var(--bg-card);
-  border-radius: 14px;
-  padding: 4px 0;
-  margin-bottom: 16px;
-}
-.cashback-item {
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  padding: 12px 16px;
-  border-bottom: 1px solid rgba(255,255,255,0.05);
-}
-.cashback-item:last-child { border-bottom: none; }
-.cashback-icon  { font-size: 20px; flex-shrink: 0; }
-.cashback-label { flex: 1; font-size: 14px; }
-.cashback-pct   {
-  font-size: 16px;
-  font-weight: 900;
-  color: #4CAF50;
-  background: rgba(76,175,80,0.12);
-  padding: 3px 10px;
-  border-radius: 20px;
-}
-
-/* ==========================================
-   Tariffe profilo (aggiornato)
-   ========================================== */
-.tariffa-card {
-  background: var(--bg-card);
-  border-radius: 12px;
-  padding: 12px 16px;
-  display: flex;
-  align-items: center;
-  gap: 12px;
-  margin-bottom: 6px;
-}
-.tariffa-info { flex: 1; min-width: 0; }
-.tariffa-desc { font-size: 13px; font-weight: 600; }
-.tariffa-orario { font-size: 11px; color: var(--text-muted); margin-top: 2px; }
-
-/* ==========================================
-   Carosello istruzioni — dashboard
-   ========================================== */
-.how-to-section {
-  padding: 4px 15px 6px;
-}
-.how-to-carousel-wrap {
-  overflow: hidden;
-  border-radius: 14px;
-}
-.how-to-carousel {
-  display: flex;
-  transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
-  will-change: transform;
-}
-.how-to-slide {
-  min-width: 100%;
-  background: var(--bg-card);
-  border-left: 3px solid rgba(255,152,0,0.5);
-  padding: 12px 16px;
-  box-sizing: border-box;
-}
-.how-to-slide.warn {
-  border-left-color: rgba(255,152,0,0.8);
-  background: rgba(255,152,0,0.07);
-}
-.slide-num {
-  font-size: 11px;
-  font-weight: 900;
-  color: var(--primary-orange);
-  letter-spacing: 1px;
-  text-transform: uppercase;
-  margin-bottom: 3px;
-}
-.how-to-slide.warn .slide-num { font-size: 14px; }
-.slide-title { font-size: 14px; font-weight: 700; margin-bottom: 3px; }
-.slide-desc  { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
-/* Dots navigazione */
-.how-to-dots {
-  display: flex;
-  justify-content: center;
-  gap: 6px;
-  padding: 7px 0 2px;
-}
-.how-to-dot {
-  width: 6px; height: 6px;
-  border-radius: 50%;
-  background: rgba(255,255,255,0.2);
-  transition: background 0.3s, width 0.3s;
-  cursor: pointer;
-}
-.how-to-dot.active {
-  background: var(--primary-orange);
-  width: 18px;
-  border-radius: 3px;
-}
-
-/* ==========================================
-   Dashboard no-scroll — layout fisso
-   ========================================== */
-#dashboard-screen {
-  display: flex;
-  flex-direction: column;
-  height: 100vh;
-  overflow: hidden;
-}
-#dashboard-screen .app-header {
-  flex-shrink: 0;
-}
-#dashboard-screen .container {
-  flex: 1;
-  overflow: hidden;
-  padding: 10px 0 0;
-  display: flex;
-  flex-direction: column;
-  gap: 0;
-}
-/* Card portafoglio più compatta */
-#dashboard-screen .dashboard-card {
-  margin: 0 15px 6px;
-  padding: 14px 18px;
-}
-#dashboard-screen .dash-balance {
-  font-size: 38px;
-}
-#dashboard-screen .dash-balance-label {
-  font-size: 10px;
-  margin-bottom: 2px;
-}
-#dashboard-screen .dash-balance-wrap {
-  padding: 6px 0 4px;
-}
-#dashboard-screen .dash-top {
-  margin-bottom: 4px;
-}
-#dashboard-screen .dash-divider {
-  margin: 8px 0;
-}
-/* Action bar compatta */
-#dashboard-screen .bottom-bar {
-  padding: 8px 15px 0;
-}
-#dashboard-screen .btn-connect-main {
-  font-size: 16px !important;
-  padding: 16px !important;
-  border-radius: 16px !important;
-  letter-spacing: 1.5px !important;
-  margin-bottom: 0 !important;
-}
-
-/* ==========================================
-   Transaction cards (storico dettagliato)
-   ========================================== */
-.tx-card, .rec-card {
-  background: var(--bg-card);
-  border-radius: 14px;
-  margin-bottom: 8px;
-  display: flex;
-  overflow: hidden;
-}
-.tx-status-bar {
-  width: 4px;
-  flex-shrink: 0;
-}
-.s-confirmed { background: #4CAF50; }
-.s-pending   { background: #FF9800; }
-.s-progress  { background: #448AFF; }
-.s-rejected  { background: #FF5252; }
-
-.tx-body { flex: 1; padding: 12px 14px; min-width: 0; }
-.tx-top  { display: flex; justify-content: space-between; align-items: baseline; margin-bottom: 6px; }
-.tx-kwh  { font-size: 18px; font-weight: 900; }
-.tx-kwh span { font-size: 12px; font-weight: 400; opacity: 0.7; }
-.tx-eur  { font-size: 16px; font-weight: 700; color: var(--primary-orange); }
-.tx-details { display: flex; flex-wrap: wrap; gap: 4px; margin-bottom: 6px; }
-.tx-tag {
-  font-size: 11px;
-  padding: 2px 7px;
-  border-radius: 6px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-  max-width: 160px;
-}
-.tag-slot { background: rgba(68,138,255,0.15); color: #448AFF; }
-.tag-op   { background: rgba(76,175,80,0.15);  color: #4CAF50; }
-.tag-svc  { background: rgba(255,152,0,0.15);  color: #FF9800; }
-.tag-tar  { background: rgba(255,255,255,0.08); color: var(--text-muted); }
-.tx-note  { font-size: 12px; color: var(--text-muted); margin-bottom: 6px; font-style: italic; }
-.tx-footer { display: flex; justify-content: space-between; align-items: center; }
-.tx-status-badge {
-  font-size: 11px;
-  font-weight: 700;
-  padding: 2px 8px;
-  border-radius: 6px;
-}
-.tx-status-badge.s-confirmed { background: rgba(76,175,80,0.15);  color: #4CAF50; }
-.tx-status-badge.s-pending   { background: rgba(255,152,0,0.15);  color: #FF9800; }
-.tx-status-badge.s-progress  { background: rgba(68,138,255,0.15); color: #448AFF; }
-.tx-status-badge.s-rejected  { background: rgba(255,82,82,0.15);  color: #FF5252; }
-.tx-date { font-size: 11px; color: var(--text-muted); }
-
-/* ==========================================
-   Fox Fidelity table
-   ========================================== */
-.fidelity-table {
-  background: var(--bg-card);
-  border-radius: 14px;
-  overflow: hidden;
-  margin-bottom: 16px;
-}
-.fidelity-header {
-  display: flex;
-  padding: 8px 14px;
-  font-size: 10px;
-  font-weight: 700;
-  color: var(--text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.5px;
-  border-bottom: 1px solid rgba(255,255,255,0.06);
-}
-.fidelity-row {
-  display: flex;
-  align-items: center;
-  padding: 12px 14px;
-  border-bottom: 1px solid rgba(255,255,255,0.04);
-  opacity: 0.5;
-  transition: opacity 0.2s;
-}
-.fidelity-row:last-child { border-bottom: none; }
-.fidelity-row.passed { opacity: 0.75; }
-.fidelity-row.active {
-  opacity: 1;
-  background: rgba(255,152,0,0.08);
-  border-left: 3px solid var(--primary-orange);
-}
-.fidelity-header span:first-child,
-.fidelity-name  { flex: 1; font-size: 13px; font-weight: 600; }
-.fidelity-header span:nth-child(2),
-.fidelity-karma { width: 80px; font-size: 12px; text-align: center; }
-.fidelity-header span:last-child,
-.fidelity-cb    { width: 70px; text-align: right; font-size: 13px; font-weight: 700; color: #4CAF50; }
-.level-max { background: linear-gradient(135deg,rgba(255,152,0,0.15),rgba(255,152,0,0.05)) !important; }
-
-/* Cashback attivo */
-.cashback-active-card {
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  background: linear-gradient(135deg,rgba(76,175,80,0.15),rgba(76,175,80,0.05));
-  border: 1px solid rgba(76,175,80,0.3);
-  border-radius: 14px;
-  padding: 14px 16px;
-  margin-bottom: 16px;
-}
-.cashback-active-icon  { font-size: 28px; }
-.cashback-active-title { font-size: 11px; color: var(--text-muted); text-transform: uppercase; letter-spacing: 0.5px; }
-.cashback-active-pct   { font-size: 26px; font-weight: 900; color: #4CAF50; line-height: 1.1; }
-.cashback-active-desc  { font-size: 12px; color: var(--text-muted); }
-
-/* ==========================================
-   Premium cashback in card + CTA non-premium
-   ========================================== */
-.premium-cashback {
-  font-size: 12px;
-  color: rgba(255,255,255,0.85);
-  margin-top: 2px;
-  font-weight: 600;
-}
-.premium-cta {
-  background: var(--bg-card);
-  border-radius: 16px;
-  padding: 14px 16px;
-  margin-bottom: 16px;
-  display: flex;
-  align-items: center;
-  gap: 14px;
-  border: 1px solid rgba(255,255,255,0.08);
-}
-.premium-cta.can-activate {
-  border-color: rgba(255,152,0,0.4);
-  background: rgba(255,152,0,0.07);
-}
-.premium-cta-icon  { font-size: 28px; flex-shrink: 0; }
-.premium-cta-title { font-size: 14px; font-weight: 700; margin-bottom: 3px; }
-.premium-cta-desc  { font-size: 12px; color: var(--text-muted); line-height: 1.5; }
-.premium-cta.can-activate .premium-cta-title { color: var(--primary-orange); }
+.bc-card { background:var(--bg-card); border-radius:14px; padding:14px 16px; margin-bottom:10px; display:flex; gap:12px; border-left:3px solid var(--primary-orange); }
+.bc-icon    { font-size:22px; flex-shrink:0; }
+.bc-body    { flex:1; min-width:0; }
+.bc-subject { font-size:13px; font-weight:700; margin-bottom:4px; }
+.bc-text    { font-size:14px; line-height:1.5; color:rgba(255,255,255,0.85); white-space:pre-wrap; }
+.bc-date    { font-size:11px; color:var(--text-muted); margin-top:6px; }

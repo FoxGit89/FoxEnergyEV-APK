@@ -11,7 +11,6 @@ const app = {
   },
   dashboard: {},
   cards:     [],
-  _broadcasts: null,
   mapping:   { 1:null, 2:null, 3:null, 4:null, 5:null, 6:null, 7:null, 8:null },
   currentSlotSelection: null,
 
@@ -107,7 +106,7 @@ const app = {
 
   async loadDashboard() {
     this.showScreen('auth-gate');
-    document.getElementById('dash-header-title').textContent = `🦊 CaliSync • ${this.user.firstName}`;
+    document.getElementById('dash-header-title').textContent = `CALISYNC • ${this.user.firstName}`;
     try {
       const dashData  = await this.apiCall({ action:'get_dashboard', user_id:this.user.telegramId });
       const cardsData = await this.apiCall({ action:'get_slots',     user_id:this.user.telegramId });
@@ -118,70 +117,23 @@ const app = {
       this.renderDashboard();
       this.renderSlots();
       this.showScreen('dashboard-screen');
-      this._initCarousel();
-      // Carica broadcasts in background (non blocca il caricamento)
-      this._loadBroadcastsBadge();
     } catch(e) { console.error(e); alert(`Errore:\n${e.message||'Connessione fallita.'}`); this.logout(); }
   },
 
   renderDashboard() {
-    const d=this.dashboard;
-    const bal=parseFloat(d.saldo||0), isPrem=!!d.is_premium, isLow=bal<2.0;
-
-    // Saldo e karma
-    document.getElementById('dash-balance-val').textContent = bal.toFixed(2);
-    document.getElementById('dash-karma-val').textContent   = d.karma||'0';
+    const bal=parseFloat(this.dashboard.saldo||0), isPrem=!!this.dashboard.is_premium, isLow=bal<2.0;
+    document.getElementById('dash-balance-val').textContent   = bal.toFixed(2);
+    document.getElementById('dash-karma-val').textContent     = this.dashboard.karma||'0';
+    document.getElementById('dash-tariff-val').textContent    = this.dashboard.loyalty_level||'Standard';
     document.getElementById('dash-card').className = 'dashboard-card'+(isPrem?' premium':'')+(isLow?' low-balance':'');
+    document.getElementById('dash-premium-badge').textContent = isPrem?'FOX PREMIUM CLUB':'UTENTE STANDARD';
     const w=document.getElementById('dash-warning'); if(isLow)w.classList.remove('hidden'); else w.classList.add('hidden');
-
-    // Badge premium / livello — usa level_name dal DB
-    const lvlName  = d.level_name || (d.loyalty_level ? `Lv.${d.loyalty_level}` : 'Standard');
-    const premBadge = document.getElementById('dash-premium-badge');
-    if (premBadge) premBadge.textContent = isPrem ? `⭐ FOX PREMIUM — ${lvlName}` : lvlName;
-
-    // Tariffe attive (possono essere multiple)
-    const tariffEl = document.getElementById('dash-tariff-val');
-    if (tariffEl) {
-      const ts = d.tariffe_attive||[];
-      if (ts.length===1) {
-        tariffEl.innerHTML = `<span class="tariff-price">€ ${parseFloat(ts[0].tariffa_eur_kwh).toFixed(4)}<small>/kWh</small></span>
-          <span class="tariff-desc">${ts[0].service_description||''}</span>`;
-      } else if (ts.length>1) {
-        tariffEl.innerHTML = ts.map(t=>
-          `<span class="tariff-chip">€ ${parseFloat(t.tariffa_eur_kwh).toFixed(4)} <small>${t.service_description||''}</small></span>`
-        ).join('');
-      } else {
-        tariffEl.textContent = 'N/D';
-      }
-    }
-
-    // Premium scadenza
-    const premExpEl = document.getElementById('dash-premium-expires');
-    if (premExpEl) {
-      if (isPrem && d.premium_expires) {
-        const exp = new Date(d.premium_expires);
-        premExpEl.textContent = `Premium fino al ${exp.toLocaleDateString('it-IT')}`;
-        premExpEl.classList.remove('hidden');
-      } else {
-        premExpEl.classList.add('hidden');
-      }
-    }
-
-    // Statistiche mensili
     const mn=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
     document.getElementById('stats-month').textContent = mn[new Date().getMonth()];
-    if (d.monthly_stats) {
-      document.getElementById('stat-energy').textContent    = `${d.monthly_stats.energy_kwh||'0.00'} kWh`;
-      document.getElementById('stat-spent').textContent     = `€ ${d.monthly_stats.spent_eur||'0.00'}`;
-      document.getElementById('stat-recharged').textContent = `€ ${d.monthly_stats.recharged_eur||'0.00'}`;
-    }
-
-    // Badge broadcasts
-    const bcBadge = document.getElementById('broadcasts-badge');
-    if (bcBadge) {
-      const n = d.unread_broadcasts||0;
-      if (n>0) { bcBadge.textContent=n>9?'9+':n; bcBadge.classList.remove('hidden'); }
-      else bcBadge.classList.add('hidden');
+    if (this.dashboard.monthly_stats) {
+      document.getElementById('stat-energy').textContent    = `${this.dashboard.monthly_stats.energy_kwh||'0.00'} kWh`;
+      document.getElementById('stat-spent').textContent     = `€ ${this.dashboard.monthly_stats.spent_eur||'0.00'}`;
+      document.getElementById('stat-recharged').textContent = `€ ${this.dashboard.monthly_stats.recharged_eur||'0.00'}`;
     }
   },
 
@@ -210,20 +162,7 @@ const app = {
     list.innerHTML=`<div class="sheet-item clear" onclick="app.selectCardForSlot(null)"><div style="font-size:24px">🚫</div><div class="sheet-item-title">Svuota / Lascia vuoto</div></div>`;
     this.cards.forEach(card=>{
       const div=document.createElement('div'); div.className='sheet-item'; div.onclick=()=>this.selectCardForSlot(card);
-      // Operatori roaming
-      const ops = (card.operators||[]).slice(0,3).join(', ');
-      const opsMore = (card.operators||[]).length>3 ? ` +${card.operators.length-3}` : '';
-      const opsLine = ops ? `<div class="slot-operators">🔌 ${ops}${opsMore}</div>` : '';
-      // Badge promo
-      const promoBadge = card.is_promo ? `<span class="slot-promo-badge">PROMO</span>` : '';
-      // Badge suspended
-      const suspBadge = card.status==='suspended' ? `<span class="slot-susp-badge">⚠️ Sospesa</span>` : '';
-      div.innerHTML=`
-        <div style="font-size:24px;color:var(--primary-orange);flex-shrink:0">💳</div>
-        <div style="flex:1;min-width:0">
-          <div class="sheet-item-title">${card.slot_label}${promoBadge}${suspBadge}</div>
-          ${opsLine}
-        </div>`;
+      div.innerHTML=`<div style="font-size:24px;color:var(--primary-orange)">💳</div><div class="sheet-item-title">${card.slot_label}</div>`;
       list.appendChild(div);
     });
     document.getElementById('slot-picker').classList.remove('hidden');
@@ -236,177 +175,25 @@ const app = {
     this.hideSlotPicker();
   },
 
-  // ── CAROSELLO ISTRUZIONI ──
-  _initCarousel() {
-    const carousel = document.getElementById('how-to-carousel');
-    const dots     = document.querySelectorAll('.how-to-dot');
-    if (!carousel || !dots.length) return;
-    let current = 0;
-    const slides = carousel.querySelectorAll('.how-to-slide');
-    const total  = slides.length;
-    const update = (idx) => {
-      current = (idx + total) % total;
-      carousel.style.transform = `translateX(-${current * 100}%)`;
-      dots.forEach((d,i) => d.classList.toggle('active', i===current));
-    };
-    // Swipe touch
-    let startX = 0;
-    carousel.addEventListener('touchstart', e => { startX = e.touches[0].clientX; }, {passive:true});
-    carousel.addEventListener('touchend',   e => {
-      const dx = e.changedTouches[0].clientX - startX;
-      if (Math.abs(dx) > 40) update(current + (dx < 0 ? 1 : -1));
-    }, {passive:true});
-    // Dot click
-    dots.forEach((d,i) => d.addEventListener('click', () => update(i)));
-    // Auto-avanza ogni 4s
-    if (this._carouselTimer) clearInterval(this._carouselTimer);
-    this._carouselTimer = setInterval(() => update(current+1), 4000);
-  },
-
-  // ── BROADCASTS badge loader ──
-  async _loadBroadcastsBadge() {
+  // ── HELPERS ──
+  _formatDate(dateStr) {
+    if (!dateStr) return '';
     try {
-      const d = await this.apiCall({ action:'get_broadcasts', user_id:this.user.telegramId });
-      this._broadcasts = d.broadcasts||[];
-      // Conta solo messaggi ultimi 7 giorni per il badge
-      const cutoff = Date.now() - 7*24*60*60*1000;
-      const n = this._broadcasts.filter(m => new Date(m.scheduled_at).getTime() >= cutoff).length;
-      const bcBadge = document.getElementById('broadcasts-badge');
-      if (bcBadge) { if(n>0){bcBadge.textContent=n>9?'9+':n;bcBadge.classList.remove('hidden');}else bcBadge.classList.add('hidden'); }
-    } catch(e) {}
+      const d=new Date(dateStr), ms=Date.now()-d;
+      const min=Math.floor(ms/60000), h=Math.floor(ms/3600000), day=Math.floor(ms/86400000);
+      if (min<1) return 'Adesso';
+      if (min<60) return `${min} min fa`;
+      if (h<24)   return `${h}h fa`;
+      if (day<7)  return `${day}g fa`;
+      return d.toLocaleDateString('it-IT',{day:'2-digit',month:'short',year:'numeric'});
+    } catch(e) { return dateStr; }
+  },
+  _esc(s) {
+    if (!s) return '';
+    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   },
 
-  // ── SEZIONE MESSAGGI ADMIN ──
-  async showBroadcasts() {
-    app.showScreen('broadcasts-screen');
-    const list = document.getElementById('broadcasts-list');
-    list.innerHTML = '<div class="loading-spinner"><div class="spinner"></div></div>';
-    try {
-      if (!this._broadcasts) {
-        const d = await this.apiCall({ action:'get_broadcasts', user_id:this.user.telegramId });
-        this._broadcasts = d.broadcasts||[];
-      }
-      this._renderBroadcasts(list);
-    } catch(e) {
-      list.innerHTML = '<div class="empty-state">❌<br>Errore nel caricamento</div>';
-    }
-  },
-
-  _renderBroadcasts(list) {
-    const msgs = this._broadcasts||[];
-    if (!msgs.length) { list.innerHTML='<div class="empty-state">📭<br>Nessun messaggio</div>'; return; }
-    const typeIcon = {info:'ℹ️',warning:'⚠️',alert:'🚨',promo:'🎁',update:'🔄'};
-    list.innerHTML = msgs.map(m=>{
-      const ico = typeIcon[m.msg_type]||'📢';
-      const date = this._formatDate(m.scheduled_at);
-      const subj = m.custom_subject ? `<div class="bc-subject">${this._esc(m.custom_subject)}</div>` : '';
-      return `<div class="bc-card">
-        <div class="bc-icon">${ico}</div>
-        <div class="bc-body">
-          ${subj}
-          <div class="bc-text">${this._esc(m.message)}</div>
-          <div class="bc-date">${date}</div>
-        </div>
-      </div>`;
-    }).join('');
-  },
-
-  // ── SEZIONE STORICO ──
-  async showHistory() {
-    app.showScreen('history-screen');
-    const list = document.getElementById('history-list');
-    list.innerHTML = '<div class="loading-spinner"><div class="spinner"></div></div>';
-    try {
-      const d = await this.apiCall({ action:'get_history', user_id:this.user.telegramId, limit:20 });
-      this._renderHistory(list, d);
-    } catch(e) {
-      list.innerHTML = '<div class="empty-state">❌<br>Errore nel caricamento</div>';
-    }
-  },
-
-  _renderHistory(list, d) {
-    const txs = d.transactions||[], recs = d.recharges||[];
-    if (!txs.length && !recs.length) {
-      list.innerHTML='<div class="empty-state">📋<br>Nessuna transazione</div>'; return;
-    }
-
-    const statusInfo = {
-      'CONFIRMED':   {icon:'✅', label:'Confermata',  cls:'s-confirmed'},
-      'PENDING':     {icon:'⏳', label:'In attesa',   cls:'s-pending'},
-      'IN PROGRESS': {icon:'🔄', label:'In corso',    cls:'s-progress'},
-      'REJECTED':    {icon:'❌', label:'Rifiutata',   cls:'s-rejected'},
-    };
-
-    let html = '';
-
-    // ── Dichiarazioni di consumo (transactions) ──
-    if (txs.length) {
-      html += '<div class="history-section-title">⚡ Dichiarazioni di Consumo</div>';
-      html += txs.map(t => {
-        const st  = statusInfo[t.status] || {icon:'❓', label:t.status, cls:'s-pending'};
-        const kwh = parseFloat(t.kwh||0).toFixed(3);
-        const eur = parseFloat(t.importo_eur||0).toFixed(2);
-        const tar = t.tariffa_eur_kwh ? `€ ${parseFloat(t.tariffa_eur_kwh).toFixed(5)}/kWh` : '';
-        // Data evento significativa in base allo stato
-        const eventDate = t.status==='CONFIRMED' ? t.approved_at
-                        : t.status==='REJECTED'  ? t.rejected_at
-                        : t.status==='IN PROGRESS'? t.in_progress_at
-                        : t.pending_at || t.created_at;
-        return `
-        <div class="history-card tx-card">
-          <div class="tx-status-bar ${st.cls}"></div>
-          <div class="tx-body">
-            <div class="tx-top">
-              <div class="tx-kwh">${kwh} <span>kWh</span></div>
-              <div class="tx-eur">€ ${eur}</div>
-            </div>
-            <div class="tx-details">
-              ${t.slot_label ? `<span class="tx-tag tag-slot">📍 ${this._esc(t.slot_label)}</span>` : ''}
-              ${t.operator_name ? `<span class="tx-tag tag-op">🔌 ${this._esc(t.operator_name)}</span>` : ''}
-              ${t.service_description ? `<span class="tx-tag tag-svc">⚡ ${this._esc(t.service_description)}</span>` : ''}
-              ${tar ? `<span class="tx-tag tag-tar">💰 ${tar}</span>` : ''}
-            </div>
-            ${t.note ? `<div class="tx-note">💬 ${this._esc(t.note)}</div>` : ''}
-            <div class="tx-footer">
-              <span class="tx-status-badge ${st.cls}">${st.icon} ${st.label}</span>
-              <span class="tx-date">${this._formatDate(t.created_at)}</span>
-            </div>
-          </div>
-        </div>`;
-      }).join('');
-    }
-
-    // ── Ricariche Wallet ──
-    if (recs.length) {
-      html += '<div class="history-section-title">💳 Ricariche Wallet</div>';
-      html += recs.map(r => {
-        const st = statusInfo[r.status] || {icon:'❓', label:r.status, cls:'s-pending'};
-        return `
-        <div class="history-card rec-card">
-          <div class="tx-status-bar s-confirmed"></div>
-          <div class="tx-body">
-            <div class="tx-top">
-              <div class="tx-kwh" style="color:#4CAF50">+ € ${parseFloat(r.importo_eur||0).toFixed(2)}</div>
-              <div class="tx-eur" style="color:#4CAF50">→ € ${parseFloat(r.total_credited||r.importo_eur||0).toFixed(2)}</div>
-            </div>
-            <div class="tx-details">
-              ${r.method ? `<span class="tx-tag tag-op">💳 ${this._esc(r.method)}</span>` : ''}
-              ${r.bonus_percent>0 ? `<span class="tx-tag tag-tar">🎁 Bonus +${r.bonus_percent}%</span>` : ''}
-            </div>
-            ${r.note ? `<div class="tx-note">💬 ${this._esc(r.note)}</div>` : ''}
-            <div class="tx-footer">
-              <span class="tx-status-badge ${st.cls}">${st.icon} ${st.label}</span>
-              <span class="tx-date">${this._formatDate(r.created_at)}</span>
-            </div>
-          </div>
-        </div>`;
-      }).join('');
-    }
-
-    list.innerHTML = html;
-  },
-
-  // ── SEZIONE PROFILO ──
+  // ── PROFILO ──
   async showProfile() {
     app.showScreen('profile-screen');
     const cont = document.getElementById('profile-content');
@@ -420,142 +207,39 @@ const app = {
   },
 
   _renderProfile(cont, d) {
-    const lvlName   = d.level_name || 'Standard';
     const isPremium = !!d.is_premium;
-    const since = d.member_since
+    const saldo     = parseFloat(d.saldo_kwh||0).toFixed(2);
+    const since     = d.member_since
       ? new Date(d.member_since).toLocaleDateString('it-IT',{month:'long',year:'numeric'}) : '';
-    const saldo = parseFloat(d.saldo_kwh||0).toFixed(2);
 
-    // ── Card Fox Premium ──
-    const karma        = parseInt(d.trust_score||0);
-    const fee          = d.premium_club_fee || 10;
-    const minKarma     = d.score_vip_threshold || 150;
-    const fidelityOn   = d.fidelity_enabled !== false;
-
+    // Card premium o standard
     let premiumHtml = '';
     if (isPremium && d.premium_expires) {
-      // Trova il livello VIP attivo in base al karma
-      const vipLevels = (d.all_levels||[]).filter(l=>l.karma_soglia!=null)
-                                          .sort((a,b)=>a.karma_soglia-b.karma_soglia);
-      let vipActive = null;
-      vipLevels.forEach(l => { if (karma >= parseInt(l.karma_soglia)) vipActive = l; });
-
-      const exp    = new Date(d.premium_expires);
-      const days   = d.premium_days_left ?? Math.max(0, Math.round((exp-Date.now())/86400000));
-      const expStr = exp.toLocaleDateString('it-IT',{day:'2-digit',month:'long',year:'numeric'});
-      const urgClass = days<=7 ? 'prem-expiry-urgent' : days<=30 ? 'prem-expiry-warn' : '';
-      const vipName  = vipActive?.level_name || 'Fox Premium';
-      const vipCb    = vipActive?.cashback;
-
+      const exp     = new Date(d.premium_expires);
+      const days    = Math.max(0, Math.round((exp-Date.now())/86400000));
+      const expStr  = exp.toLocaleDateString('it-IT',{day:'2-digit',month:'long',year:'numeric'});
+      const urgCls  = days<=7 ? 'prem-expiry-urgent' : days<=30 ? 'prem-expiry-warn' : '';
       premiumHtml = `
         <div class="premium-card">
           <div class="premium-card-top">
             <div class="premium-star">⭐</div>
             <div style="flex:1">
               <div class="premium-title">FOX PREMIUM CLUB</div>
-              <div class="premium-level">${this._esc(vipName)}</div>
-              ${vipCb ? `<div class="premium-cashback">💰 Cashback +${vipCb}%</div>` : ''}
+              <div class="premium-level">Membro attivo</div>
             </div>
-            <div class="premium-days ${urgClass}">
+            <div class="premium-days ${urgCls}">
               <div class="premium-days-num">${days}</div>
               <div class="premium-days-lbl">giorni</div>
             </div>
           </div>
-          <div class="premium-expiry ${urgClass}">
-            ${days<=7?'⚠️ ':'📅 '}Scade il ${expStr} · Fee € ${fee}/mese
+          <div class="premium-expiry ${urgCls}">
+            ${days<=7?'⚠️ ':'📅 '}Scade il ${expStr}
           </div>
         </div>`;
-    } else if (!isPremium) {
-      // Utente non premium: mostra info per attivare
-      const canActivate = karma >= minKarma;
-      premiumHtml = `
-        <div class="premium-cta ${canActivate?'can-activate':''}">
-          <div class="premium-cta-icon">${canActivate?'🦊':'🔒'}</div>
-          <div class="premium-cta-body">
-            <div class="premium-cta-title">${canActivate?'Puoi attivare Fox Premium!':'Fox Premium Club'}</div>
-            <div class="premium-cta-desc">
-              ${canActivate
-                ? `Hai ${karma} karma — soglia minima raggiunta (${minKarma}). Fee mensile: € ${fee}.`
-                : `Karma richiesto: ${minKarma} · Il tuo karma: ${karma} · Mancano: ${Math.max(0,minKarma-karma)}`}
-            </div>
-          </div>
-        </div>`;
+    } else {
+      premiumHtml = `<div class="profile-level-badge">🦊 Fox Standard</div>`;
     }
 
-    // ── Livelli VIP Fox Fidelity con karma e cashback ──
-    const levels  = (d.all_levels||[]).filter(l=>l.karma_soglia!=null).sort((a,b)=>a.karma_soglia-b.karma_soglia);
-    // Trova livello corrente (massimo raggiunto)
-    let curIdx = -1;
-    levels.forEach((l,i)=>{ if(karma>=(parseInt(l.karma_soglia)||0)) curIdx=i; });
-    const nextLvl    = curIdx < levels.length-1 ? levels[curIdx+1] : null;
-    const curLvlData = curIdx>=0 ? levels[curIdx] : null;
-
-    // Progress bar verso prossimo livello
-    let progressHtml = '';
-    if (nextLvl) {
-      const soglia    = parseInt(nextLvl.karma_soglia);
-      const fromKarma = curLvlData ? parseInt(curLvlData.karma_soglia) : 0;
-      const pct       = Math.min(100, Math.round(((karma-fromKarma)/(soglia-fromKarma))*100));
-      const mancano   = Math.max(0, soglia - karma);
-      progressHtml = `
-        <div class="level-progress-card">
-          <div class="level-progress-header">
-            <span class="level-cur">${this._esc(curLvlData?.level_name||lvlName)}</span>
-            <span class="level-arrow">→</span>
-            <span class="level-next">${this._esc(nextLvl.level_name)}</span>
-          </div>
-          <div class="level-progress-bar-bg">
-            <div class="level-progress-bar-fill" style="width:${pct}%"></div>
-          </div>
-          <div class="level-progress-info">
-            <span>🛡️ ${karma} karma</span>
-            <span>${mancano} karma al prossimo livello</span>
-          </div>
-        </div>`;
-    } else if (curLvlData) {
-      progressHtml = `
-        <div class="level-progress-card level-max">
-          <div style="text-align:center;padding:4px 0">
-            <div style="font-size:22px;margin-bottom:4px">🏆</div>
-            <div style="font-weight:900;font-size:15px">Livello Massimo!</div>
-            <div style="font-size:12px;color:rgba(255,255,255,0.6);margin-top:4px">${this._esc(lvlName)} · ${karma} karma</div>
-          </div>
-        </div>`;
-    }
-
-    // Tabella livelli Fox Fidelity
-    let fidelityHtml = '';
-    if (levels.length) {
-      fidelityHtml = `
-        <div class="profile-section-title">⭐ Fox Premium — Livelli VIP</div>
-        <div class="fidelity-table">
-          <div class="fidelity-header"><span>Livello</span><span>Karma</span><span>Cashback</span></div>
-          ${levels.map((l,i)=>{
-            const soglia  = parseInt(l.karma_soglia||0);
-            const reached = karma >= soglia;
-            const isCur   = i===curIdx;
-            return `<div class="fidelity-row ${isCur?'active':reached?'passed':''}">
-              <span class="fidelity-name">${isCur?'⭐':reached?'✅':'🔒'} ${this._esc(l.level_name)}</span>
-              <span class="fidelity-karma">${soglia.toLocaleString('it-IT')}</span>
-              <span class="fidelity-cb">${l.cashback ? '+'+l.cashback+'%' : '—'}</span>
-            </div>`;
-          }).join('')}
-        </div>`;
-    }
-
-    // Cashback attivo
-    let cashbackHtml = '';
-    if (curLvlData?.cashback) {
-      cashbackHtml = `
-        <div class="cashback-active-card">
-          <div class="cashback-active-icon">💰</div>
-          <div>
-            <div class="cashback-active-title">Cashback attivo</div>
-            <div class="cashback-active-pct">+${curLvlData.cashback}%</div>
-            <div class="cashback-active-desc">su ogni ricarica wallet</div>
-          </div>
-        </div>`;
-    }
     cont.innerHTML = `
       <div class="profile-header">
         <div class="profile-avatar ${isPremium?'premium':''}">${(d.first_name||'?')[0].toUpperCase()}</div>
@@ -565,7 +249,6 @@ const app = {
       </div>
 
       ${premiumHtml}
-      ${!isPremium?`<div class="profile-level-badge">🦊 Fox Standard</div>`:''}
 
       <div class="profile-stats-row">
         <div class="profile-stat">
@@ -592,36 +275,123 @@ const app = {
           <span class="lifetime-lbl">Importo totale</span>
           <span class="lifetime-val">€ ${parseFloat(d.totals?.eur_total||0).toFixed(2)}</span>
         </div>
-        ${parseFloat(d.totals?.kwh_ricaricati||0)>0?`
-        <div class="lifetime-item">
-          <span class="lifetime-lbl">Wallet ricaricato</span>
-          <span class="lifetime-val">€ ${parseFloat(d.totals.kwh_ricaricati).toFixed(2)}</span>
-        </div>`:''}
       </div>
 
-      ${progressHtml}
-      ${fidelityHtml}
-      ${cashbackHtml}
-      ${tariffeHtml}
+      ${d.tariffe?.length ? `
+      <div class="profile-section-title">⚡ Tariffe applicate</div>
+      <div class="profile-tariffe">
+        ${d.tariffe.map(t=>`
+          <div class="tariffa-card">
+            <div class="tariffa-price">€ ${parseFloat(t.tariffa_eur_kwh).toFixed(4)}<span>/kWh</span></div>
+            <div class="tariffa-info">
+              <div class="tariffa-desc">${this._esc(t.service_description||t.level_name)}</div>
+              <div class="tariffa-orario">${t.start_time?.slice(0,5)||'00:00'}–${t.end_time?.slice(0,5)||'23:59'}</div>
+            </div>
+          </div>`).join('')}
+      </div>` : ''}
     `;
   },
 
-  // ── HELPERS ──
-  _formatDate(dateStr) {
-    if (!dateStr) return '';
+  // ── STORICO ──
+  async showHistory() {
+    app.showScreen('history-screen');
+    const list = document.getElementById('history-list');
+    list.innerHTML = '<div class="loading-spinner"><div class="spinner"></div></div>';
     try {
-      const d=new Date(dateStr), ms=Date.now()-d;
-      const min=Math.floor(ms/60000), h=Math.floor(ms/3600000), day=Math.floor(ms/86400000);
-      if (min<1)  return 'Ora';
-      if (min<60) return `${min} min fa`;
-      if (h<24)   return `${h}h fa`;
-      if (day<7)  return `${day}g fa`;
-      return d.toLocaleDateString('it-IT',{day:'2-digit',month:'short',year:'numeric'});
-    } catch(e) { return dateStr; }
+      const d = await this.apiCall({ action:'get_history', user_id:this.user.telegramId, limit:20 });
+      this._renderHistory(list, d);
+    } catch(e) {
+      list.innerHTML = '<div class="empty-state">❌<br>Errore nel caricamento</div>';
+    }
   },
-  _esc(s) {
-    if (!s) return '';
-    return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+
+  _renderHistory(list, d) {
+    const txs  = d.transactions||[];
+    const recs = d.recharges||[];
+    if (!txs.length && !recs.length) {
+      list.innerHTML = '<div class="empty-state">📋<br>Nessuna transazione</div>'; return;
+    }
+    const stInfo = {
+      'CONFIRMED':   {icon:'✅',label:'Confermata',  cls:'s-confirmed'},
+      'PENDING':     {icon:'⏳',label:'In attesa',   cls:'s-pending'},
+      'IN PROGRESS': {icon:'🔄',label:'In corso',    cls:'s-progress'},
+      'REJECTED':    {icon:'❌',label:'Rifiutata',   cls:'s-rejected'},
+    };
+    let html = '';
+    if (txs.length) {
+      html += '<div class="history-section-title">⚡ Dichiarazioni di Consumo</div>';
+      html += txs.map(t=>{
+        const st  = stInfo[t.status]||{icon:'❓',label:t.status,cls:'s-pending'};
+        return `<div class="history-card tx-card">
+          <div class="tx-status-bar ${st.cls}"></div>
+          <div class="tx-body">
+            <div class="tx-top">
+              <div class="tx-kwh">${parseFloat(t.kwh||0).toFixed(3)} <span>kWh</span></div>
+              <div class="tx-eur">€ ${parseFloat(t.importo_eur||0).toFixed(2)}</div>
+            </div>
+            <div class="tx-details">
+              ${t.slot_label?`<span class="tx-tag tag-slot">📍 ${this._esc(t.slot_label)}</span>`:''}
+              ${t.operator_name?`<span class="tx-tag tag-op">🔌 ${this._esc(t.operator_name)}</span>`:''}
+              ${t.service_description?`<span class="tx-tag tag-svc">⚡ ${this._esc(t.service_description)}</span>`:''}
+            </div>
+            ${t.note?`<div class="tx-note">💬 ${this._esc(t.note)}</div>`:''}
+            <div class="tx-footer">
+              <span class="tx-status-badge ${st.cls}">${st.icon} ${st.label}</span>
+              <span class="tx-date">${this._formatDate(t.created_at)}</span>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+    if (recs.length) {
+      html += '<div class="history-section-title">💳 Ricariche Wallet</div>';
+      html += recs.map(r=>{
+        const st = stInfo[r.status]||{icon:'❓',label:r.status,cls:'s-pending'};
+        return `<div class="history-card tx-card">
+          <div class="tx-status-bar s-confirmed"></div>
+          <div class="tx-body">
+            <div class="tx-top">
+              <div class="tx-kwh" style="color:#4CAF50">+ € ${parseFloat(r.importo_eur||0).toFixed(2)}</div>
+              <div class="tx-eur" style="color:#4CAF50">→ € ${parseFloat(r.total_credited||r.importo_eur||0).toFixed(2)}</div>
+            </div>
+            <div class="tx-details">
+              ${r.method?`<span class="tx-tag tag-op">💳 ${this._esc(r.method)}</span>`:''}
+              ${r.bonus_percent>0?`<span class="tx-tag tag-svc">🎁 Bonus +${r.bonus_percent}%</span>`:''}
+            </div>
+            ${r.note?`<div class="tx-note">💬 ${this._esc(r.note)}</div>`:''}
+            <div class="tx-footer">
+              <span class="tx-status-badge ${st.cls}">${st.icon} ${st.label}</span>
+              <span class="tx-date">${this._formatDate(r.created_at)}</span>
+            </div>
+          </div>
+        </div>`;
+      }).join('');
+    }
+    list.innerHTML = html;
+  },
+
+  // ── MESSAGGI ADMIN ──
+  async showBroadcasts() {
+    app.showScreen('broadcasts-screen');
+    const list = document.getElementById('broadcasts-list');
+    list.innerHTML = '<div class="loading-spinner"><div class="spinner"></div></div>';
+    try {
+      const d = await this.apiCall({ action:'get_broadcasts', user_id:this.user.telegramId });
+      const msgs = d.broadcasts||[];
+      if (!msgs.length) { list.innerHTML='<div class="empty-state">📭<br>Nessun messaggio</div>'; return; }
+      const typeIcon = {info:'ℹ️',warning:'⚠️',alert:'🚨',promo:'🎁',update:'🔄'};
+      list.innerHTML = msgs.map(m=>`
+        <div class="bc-card">
+          <div class="bc-icon">${typeIcon[m.msg_type]||'📢'}</div>
+          <div class="bc-body">
+            ${m.custom_subject?`<div class="bc-subject">${this._esc(m.custom_subject)}</div>`:''}
+            <div class="bc-text">${this._esc(m.message)}</div>
+            <div class="bc-date">${this._formatDate(m.scheduled_at)}</div>
+          </div>
+        </div>`).join('');
+    } catch(e) {
+      list.innerHTML = '<div class="empty-state">❌<br>Errore nel caricamento</div>';
+    }
   },
 
   // PASSO 1: utente clicca "Collega e Configura"
@@ -818,15 +588,17 @@ const secureSession = {
       document.getElementById('wipe-title').textContent=title;
       document.getElementById('wipe-status').textContent=status;
     };
-    setWipe('🦊🗑️','CANCELLAZIONE IN CORSO',reason==='auto'?'Timer scaduto — pulizia slot...':'Cancellazione manuale...');
+    setWipe('🗑️','CANCELLAZIONE IN CORSO',reason==='auto'?'Timer scaduto — pulizia slot...':'Cancellazione manuale...');
     try {
       await bleEngine.wipeAllSlots(setWipe);
       if(navigator.vibrate)navigator.vibrate([100,50,200]);
+      app.apiCall({ action: 'end_session', user_id: app.user.telegramId, reason: reason }).catch(()=>{});
       setWipe('🦊✅','DISPOSITIVO PULITO','Tutti gli slot sono stati cancellati. Arrivederci!');
       setTimeout(()=>{this._wiping=false;app.showScreen('dashboard-screen');},2000);
     } catch(err) {
       console.error('[WIPE ERROR]',err);
       // BLE perso: notifica admin e logout sicuro
+      app.apiCall({ action: 'end_session', user_id: app.user.telegramId, reason: 'ble_lost' }).catch(() => {});
       app.apiCall({
         action: 'notify_admin',
         user_id: app.user.telegramId,
