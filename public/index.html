@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>FoxSync by Fox Energy EV</title>
   <meta name="theme-color" content="#FF9800">
-  <link rel="manifest" href="manifest.json?v=50">
-  <link rel="stylesheet" href="style.css?v=50">
+  <link rel="manifest" href="manifest.json?v=51">
+  <link rel="stylesheet" href="style.css?v=51">
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/index.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/Crypto1.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/plugin/WebbleAdapter.global.js"></script>
@@ -50,10 +50,7 @@
   <div id="dashboard-screen" class="screen hidden">
     <div class="app-header">
       <span id="dash-header-title">FOXSYNC</span>
-      <div style="display:flex;gap:6px;align-items:center">
-        <a href="https://t.me/Fox_Ev_bot" target="_blank" class="header-action" style="text-decoration:none" title="Bot Telegram per Dichiarare e Ricaricare">Telegram Bot</a>
-        <button class="header-action" onclick="app.logout()">🚪</button>
-      </div>
+      <button class="header-action" onclick="app.logout()">🚪</button>
     </div>
     <div class="container" style="padding-bottom:140px">
       <div id="dash-card" class="dashboard-card" onclick="app.showScreen('stats-screen')">
@@ -78,6 +75,14 @@
         </div>
       </div>
     </div>
+
+    <!-- Banner Telegram Bot -->
+    <a href="https://t.me/Fox_Ev_bot" target="_blank" class="tg-bot-banner">
+      <span class="tg-bot-icon">✈️</span>
+      <span class="tg-bot-text">Vai al Bot Telegram per Dichiarare Consumi e Ricaricare il Wallet</span>
+      <span class="tg-bot-arrow">›</span>
+    </a>
+
     <!-- Pulsante unico grande centrato -->
     <div class="bottom-bar">
       <button class="btn-primary btn-connect-main" onclick="app.startConnectFlow()">
@@ -266,6 +271,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=50"></script>
+  <script src="app.js?v=51"></script>
 </body>
 </html>

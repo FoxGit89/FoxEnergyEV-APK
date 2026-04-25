@@ -801,3 +801,24 @@ input {
   overflow: hidden;
   text-overflow: ellipsis;
 }
+
+/* ==========================================
+   Banner Telegram Bot
+   ========================================== */
+.tg-bot-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  background: rgba(41, 182, 246, 0.12);
+  border: 1px solid rgba(41, 182, 246, 0.35);
+  border-radius: 12px;
+  padding: 10px 14px;
+  margin: 6px 15px 4px;
+  text-decoration: none;
+  color: #29B6F6;
+  transition: background 0.2s;
+}
+.tg-bot-banner:active { background: rgba(41,182,246,0.22); }
+.tg-bot-icon  { font-size: 18px; flex-shrink: 0; }
+.tg-bot-text  { flex: 1; font-size: 12px; font-weight: 600; line-height: 1.4; }
+.tg-bot-arrow { font-size: 18px; opacity: 0.7; flex-shrink: 0; }
