@@ -238,6 +238,12 @@ try {
                 $msg .= "💾 Slot caricati: {$slots}\n";
                 if ($error) $msg .= "❌ Errore: {$error}\n";
                 $msg .= "\n⚠️ Gli slot potrebbero <b>NON</b> essere stati cancellati!";
+                // Scrivi in system_logs come ERROR
+                try {
+                    $log_msg = "BLE disconnesso durante sessione | Utente: @" . ($user['username'] ?? $user_id) . " (ID:{$user_id}) | Slot: {$slots}" . ($error ? " | Errore: {$error}" : "");
+                    db()->prepare("INSERT INTO system_logs (level, context, user_id, message) VALUES ('ERROR','CaliSync',?,?)")
+                        ->execute([$user['id'] ?? null, $log_msg]);
+                } catch(Exception $e) {}
             } else {
                 $msg .= "📋 Evento: {$event}\n";
                 if ($slots) $msg .= "💾 Slot: {$slots}";
@@ -309,18 +315,31 @@ try {
 
                         // Manda notifica solo se ci sono anomalie
                         if (!empty($alerts)) {
-                            $msg  = "🦊 <b>ANOMALIA SESSIONE</b>
+                            $tg_msg  = "🦊 <b>ANOMALIA SESSIONE</b>
 ";
-                            $msg .= "👤 {$u_name} (ID: {$user_id})
+                            $tg_msg .= "👤 {$u_name} (ID: {$user_id})
 ";
-                            $msg .= "⏱ Durata: {$dur}s · Motivo: {$reason}
+                            $tg_msg .= "⏱ Durata: {$dur}s · Motivo: {$reason}
 ";
-                            $msg .= "💾 Slot: " . ($sess['slots_loaded'] ?? '—') . "
+                            $tg_msg .= "💾 Slot: " . ($sess['slots_loaded'] ?? '—') . "
 
 ";
-                            foreach ($alerts as $a) $msg .= "• {$a}
+                            foreach ($alerts as $a) $tg_msg .= "• {$a}
 ";
 
+                            // Scrivi in system_logs (visibile nel portale admin)
+                            $log_msg = "Sessione Chameleon anomala | Utente: {$u_name} | "
+                                     . "Durata: {$dur}s | Motivo: {$reason} | "
+                                     . "Slot: " . ($sess['slots_loaded'] ?? '—') . " | "
+                                     . implode(' | ', $alerts);
+                            try {
+                                db()->prepare("
+                                    INSERT INTO system_logs (level, context, user_id, message)
+                                    VALUES ('WARNING', 'CaliSync', ?, ?)
+                                ")->execute([$user['id'] ?? null, $log_msg]);
+                            } catch(Exception $e) {}
+
+                            // Notifica Telegram admin
                             $admins = db()->query(
                                 "SELECT chat_id FROM admin_users WHERE chat_id IS NOT NULL AND chat_id!=''"
                             )->fetchAll(PDO::FETCH_COLUMN);
@@ -329,7 +348,7 @@ try {
                                 @file_get_contents(
                                     "https://api.telegram.org/bot{$token}/sendMessage"
                                     . "?chat_id=" . urlencode($cid)
-                                    . "&text="    . urlencode($msg)
+                                    . "&text="    . urlencode($tg_msg)
                                     . "&parse_mode=HTML"
                                 );
                             }
@@ -465,18 +484,31 @@ try {
 
                         // Manda notifica solo se ci sono anomalie
                         if (!empty($alerts)) {
-                            $msg  = "🦊 <b>ANOMALIA SESSIONE</b>
+                            $tg_msg  = "🦊 <b>ANOMALIA SESSIONE</b>
 ";
-                            $msg .= "👤 {$u_name} (ID: {$user_id})
+                            $tg_msg .= "👤 {$u_name} (ID: {$user_id})
 ";
-                            $msg .= "⏱ Durata: {$dur}s · Motivo: {$reason}
+                            $tg_msg .= "⏱ Durata: {$dur}s · Motivo: {$reason}
 ";
-                            $msg .= "💾 Slot: " . ($sess['slots_loaded'] ?? '—') . "
+                            $tg_msg .= "💾 Slot: " . ($sess['slots_loaded'] ?? '—') . "
 
 ";
-                            foreach ($alerts as $a) $msg .= "• {$a}
+                            foreach ($alerts as $a) $tg_msg .= "• {$a}
 ";
 
+                            // Scrivi in system_logs (visibile nel portale admin)
+                            $log_msg = "Sessione Chameleon anomala | Utente: {$u_name} | "
+                                     . "Durata: {$dur}s | Motivo: {$reason} | "
+                                     . "Slot: " . ($sess['slots_loaded'] ?? '—') . " | "
+                                     . implode(' | ', $alerts);
+                            try {
+                                db()->prepare("
+                                    INSERT INTO system_logs (level, context, user_id, message)
+                                    VALUES ('WARNING', 'CaliSync', ?, ?)
+                                ")->execute([$user['id'] ?? null, $log_msg]);
+                            } catch(Exception $e) {}
+
+                            // Notifica Telegram admin
                             $admins = db()->query(
                                 "SELECT chat_id FROM admin_users WHERE chat_id IS NOT NULL AND chat_id!=''"
                             )->fetchAll(PDO::FETCH_COLUMN);
@@ -485,7 +517,7 @@ try {
                                 @file_get_contents(
                                     "https://api.telegram.org/bot{$token}/sendMessage"
                                     . "?chat_id=" . urlencode($cid)
-                                    . "&text="    . urlencode($msg)
+                                    . "&text="    . urlencode($tg_msg)
                                     . "&parse_mode=HTML"
                                 );
                             }
