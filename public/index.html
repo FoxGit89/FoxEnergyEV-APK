@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>FoxSync by Fox Energy EV</title>
   <meta name="theme-color" content="#FF9800">
-  <link rel="manifest" href="manifest.json?v=62">
-  <link rel="stylesheet" href="style.css?v=62">
+  <link rel="manifest" href="manifest.json?v=64">
+  <link rel="stylesheet" href="style.css?v=64">
   <!-- Leaflet per mappa colonnine -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -240,16 +240,25 @@
         Avvicinati alla colonnina e usa il Chameleon Ultra.<br>
         Gli slot verranno cancellati automaticamente alla scadenza.
       </div>
+
+      <!-- Avviso monitoraggio -->
+      <div class="session-monitor-notice">
+        🛡️ <b>Sessione monitorata da FoxSync Security</b><br>
+        <span>Posizione, durata e modalità di chiusura vengono registrate.<br>
+        Chiudi sempre la sessione con il pulsante qui sotto.</span>
+      </div>
+
       <div id="session-warning-bar" class="session-warning-bar hidden">
         ⚠️ Cancellazione in corso tra <span id="session-warning-secs">10</span>s
       </div>
-      <div style="width:100%;margin-top:30px">
+      <div style="width:100%;margin-top:20px">
         <button id="session-cancel-btn" class="btn-danger" onclick="secureSession.cancel('manual')">
           🗑️ CANCELLA ORA E CHIUDI
         </button>
         <p style="color:var(--text-muted);font-size:12px;margin-top:14px;line-height:1.6">
-          Premi dopo aver usato la tessera.<br>
-          La cancellazione rimuove tutti i dati dal dispositivo.
+          <b style="color:rgba(255,165,0,0.9)">⚠️ Non chiudere l'app durante la sessione.</b><br>
+          La mancata cancellazione viene segnalata agli amministratori<br>
+          e può comportare la sospensione dell'accesso.
         </p>
       </div>
     </div>
@@ -339,6 +348,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=62"></script>
+  <script src="app.js?v=64"></script>
 </body>
 </html>

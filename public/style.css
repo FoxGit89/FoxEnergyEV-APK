@@ -952,3 +952,20 @@ input {
 }
 .map-dot.green { background: #4CAF50; }
 .map-dot.grey  { background: #9E9E9E; }
+
+/* ==========================================
+   Avviso monitoraggio sessione
+   ========================================== */
+.session-monitor-notice {
+  background: rgba(255, 152, 0, 0.1);
+  border: 1px solid rgba(255, 152, 0, 0.3);
+  border-radius: 10px;
+  padding: 10px 14px;
+  font-size: 12px;
+  color: rgba(255,255,255,0.75);
+  line-height: 1.6;
+  margin-bottom: 12px;
+  max-width: 320px;
+  text-align: left;
+}
+.session-monitor-notice b { color: #FF9800; }

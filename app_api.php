@@ -486,8 +486,14 @@ try {
                                 } catch(Exception $e) {}
 
                                 // Notifica utente
-                                $tg_u  = "⚠️ <b>FoxSync — Sessione interrotta</b>
-
+                                $tg_u  = "🛡️ <b>FoxSync Security — Irregolarità rilevata</b>\n";
+                                $tg_u .= "La tua sessione Chameleon risulta <b>non chiusa correttamente</b>.\n\n";
+                                $tg_u .= "📋 <b>Cosa succede ora:</b>\n";
+                                $tg_u .= "• I log di sessione (posizione GPS, durata, tessere usate) sono stati acquisiti\n";
+                                $tg_u .= "• Il team Fox Energy verificherà i dati registrati\n";
+                                $tg_u .= "• In caso di utilizzo non regolare, l'accesso potrà essere sospeso\n\n";
+                                $tg_u .= "✅ Se hai usato le tessere regolarmente, dichiara il consumo dal bot e contatta un amministratore.\n\n";
+                                $tg_u .= "<i>FoxSync Security registra ogni sessione per garantire un servizio equo a tutti gli utenti.</i>";
 ";
                                 $tg_u .= "La tua sessione Chameleon non è stata chiusa correttamente.
 
@@ -645,17 +651,22 @@ try {
                             } catch(Exception $e) {}
 
                             // Notifica admin Telegram
-                            $tg_admin  = "🦊 <b>ANOMALIA FOXSYNC</b>
+                            $tg_admin  = "🦊 <b>ANOMALIA FOXSYNC — Azione richiesta</b>
+";
+                            $tg_admin .= "━━━━━━━━━━━━━━━━━━━━━━
 ";
                             $tg_admin .= "👤 {$uname} (ID:{$user_id})
 ";
                             $tg_admin .= "⏱ Durata: {$dur}s · Motivo: {$rsn}
 ";
                             $tg_admin .= "💾 Slot: " . ($sess['slots_loaded']??'—') . "
-
 ";
-                            foreach ($alerts as $a) $tg_admin .= "• {$a}
+                            $tg_admin .= "━━━━━━━━━━━━━━━━━━━━━━
 ";
+                            foreach ($alerts as $a) $tg_admin .= "⚠️ {$a}
+";
+                            $tg_admin .= "
+📋 L'utente è stato avvisato. Verifica i log nel portale.";
                             try {
                                 $admins = db()->query("SELECT chat_id FROM admin_users WHERE chat_id IS NOT NULL AND chat_id!=''")->fetchAll(PDO::FETCH_COLUMN);
                                 foreach ($admins as $cid)
@@ -663,8 +674,19 @@ try {
                             } catch(Exception $e) {}
 
                             // Notifica utente Telegram
-                            $tg_user  = "⚠️ <b>FoxSync Security Alert</b>
-
+                            $tg_user  = "🛡️ <b>FoxSync Security — Avviso utilizzo</b>\n";
+                            $tg_user .= "\n";
+                            $tg_user .= "Il sistema ha rilevato un <b>utilizzo anomalo</b> del tuo Chameleon Ultra.\n";
+                            $tg_user .= "\n";
+                            $tg_user .= "📍 Sessione registrata con:\n";
+                            $tg_user .= "• Posizione GPS acquisita\n";
+                            $tg_user .= "• Durata e tessere caricate tracciate\n";
+                            $tg_user .= "• Log inviato agli amministratori\n";
+                            $tg_user .= "\n";
+                            $tg_user .= "⚠️ <b>Utilizzi ripetuti non regolari comportano la sospensione immediata dell'accesso a FoxSync.</b>\n";
+                            $tg_user .= "\n";
+                            $tg_user .= "Attendi un contatto dal team Fox Energy.\n";
+                            $tg_user .= "<i>Se ritieni si tratti di un errore, rispondi a questo messaggio.</i>";
 ";
                             $tg_user .= "È stato rilevato un utilizzo anomalo del tuo Chameleon Ultra.
 
