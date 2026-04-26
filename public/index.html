@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>FoxSync by Fox Energy EV</title>
   <meta name="theme-color" content="#FF9800">
-  <link rel="manifest" href="manifest.json?v=53">
-  <link rel="stylesheet" href="style.css?v=53">
+  <link rel="manifest" href="manifest.json?v=57">
+  <link rel="stylesheet" href="style.css?v=57">
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/index.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/Crypto1.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/plugin/WebbleAdapter.global.js"></script>
@@ -52,7 +52,11 @@
       <span id="dash-header-title">FOXSYNC</span>
       <button class="header-action" onclick="app.logout()">🚪</button>
     </div>
-    <div class="container" style="padding-bottom:140px">
+
+    <!-- Layout flexbox: tutto in una schermata senza scroll -->
+    <div class="dash-layout">
+
+      <!-- Card portafoglio (compatta, non cresce) -->
       <div id="dash-card" class="dashboard-card" onclick="app.showScreen('stats-screen')">
         <div class="dash-top">
           <div>
@@ -74,70 +78,71 @@
           <div class="dash-bottom-item" style="flex:1;white-space:nowrap;overflow:hidden;text-overflow:ellipsis">⚡ Tariffa: <span id="dash-tariff-val">Standard</span></div>
         </div>
       </div>
-    </div>
 
-    <!-- Banner Telegram Bot -->
-    <a href="https://t.me/Fox_Ev_bot" target="_blank" class="tg-bot-banner">
-      <span class="tg-bot-icon">✈️</span>
-      <span class="tg-bot-text">Vai al Bot Telegram per Dichiarare Consumi e Ricaricare il Wallet</span>
-      <span class="tg-bot-arrow">›</span>
-    </a>
+      <!-- Banner Telegram (compatto, non cresce) -->
+      <a href="https://t.me/Fox_Ev_bot" target="_blank" class="tg-bot-banner">
+        <span class="tg-bot-icon">✈️</span>
+        <span class="tg-bot-text">Vai al Bot Telegram per Dichiarare Consumi e Ricaricare il Wallet</span>
+        <span class="tg-bot-arrow">›</span>
+      </a>
 
-    <!-- Istruzioni a carosello -->
-    <div class="how-to-section">
-      <div class="how-to-carousel-wrap">
-        <div class="how-to-carousel" id="how-to-carousel">
-          <div class="how-to-slide">
-            <div class="slide-num">1</div>
-            <div class="slide-title">🦊 Collega il Chameleon</div>
-            <div class="slide-desc">Premi il pulsante. Il dispositivo viene pulito e puoi scegliere le tessere da caricare.</div>
-          </div>
-          <div class="how-to-slide">
-            <div class="slide-num">2</div>
-            <div class="slide-title">🦊 Seleziona e sincronizza</div>
-            <div class="slide-desc">Assegna le tessere RFID agli slot e avvia la sincronizzazione.</div>
-          </div>
-          <div class="how-to-slide">
-            <div class="slide-num">3</div>
-            <div class="slide-title">🦊 Usa — hai 60 secondi</div>
-            <div class="slide-desc">Avvicinati alla colonnina. Alla scadenza gli slot vengono cancellati in automatico.</div>
-          </div>
-          <div class="how-to-slide warn">
-            <div class="slide-num">⚠️</div>
-            <div class="slide-title">Tieni il telefono vicino</div>
-            <div class="slide-desc">Non chiudere l'app. Se BT si disconnette gli admin vengono avvisati.</div>
+      <!-- Carosello istruzioni (occupa lo spazio rimanente) -->
+      <div class="how-to-section">
+        <div class="how-to-carousel-wrap">
+          <div class="how-to-carousel" id="how-to-carousel">
+            <div class="how-to-slide">
+              <div class="slide-num">1</div>
+              <div class="slide-title">🦊 Collega il Chameleon</div>
+              <div class="slide-desc">Premi il pulsante. Il dispositivo viene pulito e puoi scegliere le tessere da caricare.</div>
+            </div>
+            <div class="how-to-slide">
+              <div class="slide-num">2</div>
+              <div class="slide-title">🦊 Seleziona e sincronizza</div>
+              <div class="slide-desc">Assegna le tessere RFID agli slot e avvia la sincronizzazione.</div>
+            </div>
+            <div class="how-to-slide">
+              <div class="slide-num">3</div>
+              <div class="slide-title">🦊 Usa — hai 60 secondi</div>
+              <div class="slide-desc">Avvicinati alla colonnina. Alla scadenza gli slot vengono cancellati in automatico.</div>
+            </div>
+            <div class="how-to-slide warn">
+              <div class="slide-num">⚠️</div>
+              <div class="slide-title">Tieni il telefono vicino</div>
+              <div class="slide-desc">Non chiudere l'app. Se BT si disconnette gli admin vengono avvisati.</div>
+            </div>
           </div>
         </div>
+        <div class="how-to-dots" id="how-to-dots">
+          <span class="how-to-dot active"></span>
+          <span class="how-to-dot"></span>
+          <span class="how-to-dot"></span>
+          <span class="how-to-dot"></span>
+        </div>
       </div>
-      <div class="how-to-dots" id="how-to-dots">
-        <span class="how-to-dot active"></span>
-        <span class="how-to-dot"></span>
-        <span class="how-to-dot"></span>
-        <span class="how-to-dot"></span>
-      </div>
-    </div>
 
-    <!-- Pulsante unico grande centrato -->
-    <div class="bottom-bar">
-      <button class="btn-primary btn-connect-main" onclick="app.startConnectFlow()">
-        🦊 COLLEGA CHAMELEON ULTRA
-      </button>
-      <div class="tab-bar">
-        <button class="tab-btn" onclick="app.showProfile()">
-          <span class="tab-icon">👤</span>
-          <span class="tab-label">Profilo</span>
+      <!-- Bottom bar fisso -->
+      <div class="bottom-bar">
+        <button class="btn-primary btn-connect-main" onclick="app.startConnectFlow()">
+          🦊 COLLEGA CHAMELEON ULTRA
         </button>
-        <button class="tab-btn" onclick="app.showHistory()">
-          <span class="tab-icon">📋</span>
-          <span class="tab-label">Storico</span>
-        </button>
-        <button class="tab-btn" onclick="app.showBroadcasts()">
-          <span class="tab-icon">📢</span>
-          <span class="tab-label">Messaggi</span>
-          <span id="broadcasts-badge" class="tab-badge hidden">0</span>
-        </button>
+        <div class="tab-bar">
+          <button class="tab-btn" onclick="app.showProfile()">
+            <span class="tab-icon">👤</span>
+            <span class="tab-label">Profilo</span>
+          </button>
+          <button class="tab-btn" onclick="app.showHistory()">
+            <span class="tab-icon">📋</span>
+            <span class="tab-label">Storico</span>
+          </button>
+          <button class="tab-btn" onclick="app.showBroadcasts()">
+            <span class="tab-icon">📢</span>
+            <span class="tab-label">Messaggi</span>
+            <span id="broadcasts-badge" class="tab-badge hidden">0</span>
+          </button>
+        </div>
       </div>
-    </div>
+
+    </div><!-- /dash-layout -->
   </div>
 
   <!-- Screen 3: Stats -->
@@ -305,6 +310,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=53"></script>
+  <script src="app.js?v=57"></script>
 </body>
 </html>

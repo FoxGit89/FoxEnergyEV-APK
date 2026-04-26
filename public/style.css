@@ -860,3 +860,63 @@ input {
   font-size: 10px;
   font-weight: 900;
 }
+
+/* ==========================================
+   Dashboard layout no-scroll (flexbox)
+   ========================================== */
+#dashboard-screen {
+  display: flex;
+  flex-direction: column;
+  height: 100vh;
+  overflow: hidden;
+}
+.dash-layout {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+  padding: 10px 15px 0;
+  gap: 8px;
+}
+/* Card portafoglio: non cresce */
+.dash-layout .dashboard-card {
+  flex-shrink: 0;
+}
+/* Banner Telegram: non cresce */
+.dash-layout .tg-bot-banner {
+  flex-shrink: 0;
+  margin: 0;
+}
+/* Carosello: occupa solo lo spazio disponibile rimasto */
+.dash-layout .how-to-section {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  flex-direction: column;
+  padding: 0;
+}
+.dash-layout .how-to-carousel-wrap {
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+  border-radius: 14px;
+}
+.dash-layout .how-to-carousel {
+  height: 100%;
+  display: flex;
+  transition: transform 0.35s cubic-bezier(0.4,0,0.2,1);
+}
+.dash-layout .how-to-slide {
+  min-width: 100%;
+  height: 100%;
+  box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+/* Bottom bar: non cresce */
+.dash-layout .bottom-bar {
+  flex-shrink: 0;
+  padding: 6px 0 0;
+  background: transparent;
+}

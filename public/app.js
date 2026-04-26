@@ -117,6 +117,7 @@ const app = {
       this.renderDashboard();
       this.renderSlots();
       this.showScreen('dashboard-screen');
+      this._initCarousel();
     } catch(e) { console.error(e); alert(`Errore:\n${e.message||'Connessione fallita.'}`); this.logout(); }
   },
 
@@ -214,6 +215,28 @@ const app = {
   _esc(s) {
     if (!s) return '';
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  },
+
+  // ── CAROSELLO ──
+  _initCarousel() {
+    const carousel = document.getElementById('how-to-carousel');
+    const dots     = document.querySelectorAll('.how-to-dot');
+    if (!carousel || !dots.length) return;
+    let current = 0;
+    const total = carousel.querySelectorAll('.how-to-slide').length;
+    const update = (idx) => {
+      current = (idx + total) % total;
+      carousel.style.transform = `translateX(-${current * 100}%)`;
+      dots.forEach((d,i) => d.classList.toggle('active', i===current));
+    };
+    carousel.addEventListener('touchstart', e => { this._swipeX = e.touches[0].clientX; }, {passive:true});
+    carousel.addEventListener('touchend',   e => {
+      const dx = e.changedTouches[0].clientX - (this._swipeX||0);
+      if (Math.abs(dx) > 40) update(current + (dx < 0 ? 1 : -1));
+    }, {passive:true});
+    dots.forEach((d,i) => d.addEventListener('click', () => update(i)));
+    if (this._carouselTimer) clearInterval(this._carouselTimer);
+    this._carouselTimer = setInterval(() => update(current+1), 4000);
   },
 
   // ── PROFILO ──
