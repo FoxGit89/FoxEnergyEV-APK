@@ -767,10 +767,43 @@ const secureSession = {
     },500);
     // Visibilità: ricalcola quando torna in foreground
     document.addEventListener('visibilitychange',this._onVis=()=>{
-      if(document.visibilityState!=='visible'||!this._startedAt||this._wiping)return;
+      if(!this._startedAt || this._wiping) return;
+
+      if(document.visibilityState==='hidden') {
+        // App in background: verifica se BLE ancora connesso
+        if(bleEngine.ultra) {
+          try {
+            // Testa la connessione — se fallisce, BLE è perso
+            bleEngine.ultra.isConnected().then(connected => {
+              if(!connected && !this._wiping) {
+                // BLE perso mentre app era in background
+                this._sendEndSession('ble_lost');
+                app.apiCall({
+                  action:'notify_admin', user_id:app.user.telegramId,
+                  event:'ble_disconnected_during_session',
+                  slots:this._slotLabels.join(','),
+                  error:'BLE perso con schermo spento o app in background'
+                }).catch(()=>{});
+              }
+            }).catch(()=>{});
+          } catch(e){}
+        }
+        return;
+      }
+
+      // App torna in foreground: ricalcola timer
       const rem=Math.max(0,SESSION_TIMEOUT_SEC-Math.floor((Date.now()-this._startedAt)/1000));
-      if(rem<=0)this.cancel('auto');
-      else{this._tick(rem);if(!this._timer){this._timer=setInterval(()=>{const r=Math.max(0,SESSION_TIMEOUT_SEC-Math.floor((Date.now()-this._startedAt)/1000));this._tick(r);if(r<=0){clearInterval(this._timer);this._timer=null;this.cancel('auto');}},500);}}
+      if(rem<=0) this.cancel('auto');
+      else{
+        this._tick(rem);
+        if(!this._timer){
+          this._timer=setInterval(()=>{
+            const r=Math.max(0,SESSION_TIMEOUT_SEC-Math.floor((Date.now()-this._startedAt)/1000));
+            this._tick(r);
+            if(r<=0){clearInterval(this._timer);this._timer=null;this.cancel('auto');}
+          },500);
+        }
+      }
     });
     // SICUREZZA: blocca navigazione browser durante sessione attiva
     window.addEventListener('beforeunload', this._onUnload=e=>{

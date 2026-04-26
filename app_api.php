@@ -6,7 +6,11 @@ ini_set('display_errors', 0);
 require_once 'functions.php'; 
 
 header('Content-Type: application/json');
-header('Access-Control-Allow-Origin: *'); 
+header('Access-Control-Allow-Origin: *');
+header('X-Content-Type-Options: nosniff');
+header('X-Frame-Options: DENY');
+header('Referrer-Policy: no-referrer');
+header('Cache-Control: no-store, no-cache, must-revalidate'); 
 
 $action = $_GET['action'] ?? '';
 
@@ -200,13 +204,41 @@ try {
     // =========================================================
     if ($action === 'get_json_content') {
         $file_id = $_GET['file_id'] ?? '';
-        
+
         if (empty($file_id)) {
             echo json_encode(['error' => 'File ID mancante.']);
             exit;
         }
 
-        $token = getenv('BOT_TOKEN'); 
+        // Sicurezza: verifica che il file_id appartenga a uno slot
+        // effettivamente autorizzato per questo utente
+        try {
+            $u_tg    = $user['telegram_id'];
+            $u_name  = $user['username'] ?? '';
+            $u_score = (int)($user['trust_score'] ?? 0);
+            $u_prem  = (int)($user['is_premium'] ?? 0);
+
+            $check = db()->prepare("
+                SELECT COUNT(*) FROM rfid_slots
+                WHERE json_file_id = ? AND status = 'active'
+                  AND (
+                      (min_trust_score <= 0 AND (allowed_users IS NULL OR allowed_users = ''))
+                      OR (min_trust_score > 0 AND ? >= min_trust_score AND ? = 1)
+                      OR FIND_IN_SET(?, allowed_users) > 0
+                      OR FIND_IN_SET(?, allowed_users) > 0
+                  )
+            ");
+            $check->execute([$file_id, $u_score, $u_prem, $u_tg, $u_name]);
+            if ((int)$check->fetchColumn() === 0) {
+                // Log tentativo non autorizzato
+                db()->prepare("INSERT INTO system_logs (level,context,user_id,message) VALUES ('WARNING','FoxSync',?,?)")
+                    ->execute([$user['id']??null, "Tentativo accesso file_id non autorizzato: {$file_id} da utente {$u_tg}"]);
+                echo json_encode(['error' => 'Accesso non autorizzato.']);
+                exit;
+            }
+        } catch(Exception $e) {}
+
+        $token = getenv('BOT_TOKEN');
         if (empty($token)) {
             echo json_encode(['error' => 'Variabile BOT_TOKEN non trovata su Railway!']);
             exit;

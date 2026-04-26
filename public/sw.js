@@ -1,55 +1,17 @@
-const CACHE_NAME = 'foxsync-v63';
-const ASSETS = [
-  './',
-  './index.html?v=63',
-  './style.css?v=63',
-  './app.js?v=63',
-  './manifest.json?v=63',
-  'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/index.global.js',
-  'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/Crypto1.global.js',
-  'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/plugin/WebbleAdapter.global.js'
-];
-
-self.addEventListener('install', event => {
-  event.waitUntil(
-    caches.open(CACHE_NAME)
-      .then(cache => cache.addAll(ASSETS))
-      .then(() => self.skipWaiting())
-  );
-});
-
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys().then(keys => {
-      return Promise.all(
-        keys.filter(key => key !== CACHE_NAME)
-          .map(key => caches.delete(key))
-      );
-    }).then(() => self.clients.claim())
-  );
-});
-
-self.addEventListener('fetch', event => {
-  // Always hit network for API
-  if (event.request.url.includes('app_api.php')) {
-    return;
-  }
-
-  // Network-first strategy for static assets to avoid aggressive caching issues
-  event.respondWith(
-    fetch(event.request)
-      .then(networkResponse => {
-        // Cache the fresh response for later offline use
-        return caches.open(CACHE_NAME).then(cache => {
-          cache.put(event.request, networkResponse.clone());
-          return networkResponse;
-        });
-      })
-      .catch(() => {
-        // If network fails (offline), fallback to cache
-        return caches.match(event.request).then(cachedResponse => {
-           return cachedResponse || new Response('Offline');
-        });
-      })
-  );
-});
+{
+  "name": "FoxSync by Fox Energy EV",
+  "short_name": "FoxSync",
+  "description": "Fox Energy EV Sync Management System",
+  "start_url": "./index.html?v=64",
+  "display": "standalone",
+  "background_color": "#FF9800",
+  "theme_color": "#FF9800",
+  "icons": [
+    {
+      "src": "data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' fill='%23FF9800'/><g transform='translate(15, 15) scale(0.7)'><polygon points='50,88 15,45 50,35' fill='%23F37A1F'/><polygon points='50,88 85,45 50,35' fill='%23BA4F0D'/><polygon points='15,45 50,35 22,12' fill='%23F37A1F'/><polygon points='85,45 50,35 78,12' fill='%23BA4F0D'/><g transform='translate(40, 43) scale(-0.35, 0.35)'><path d='M20,0 L0,30 L12,30 L5,55 L25,25 L15,25 L25,0 Z' fill='%23FFFFFF'/></g><g transform='translate(60, 43) scale(0.35)'><path d='M20,0 L0,30 L12,30 L5,55 L25,25 L15,25 L25,0 Z' fill='%23FFFFFF'/></g></g></svg>",
+      "type": "image/svg+xml",
+      "sizes": "512x512",
+      "purpose": "any maskable"
+    }
+  ]
+}
