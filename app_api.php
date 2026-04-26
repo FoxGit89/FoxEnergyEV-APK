@@ -127,25 +127,28 @@ try {
         $slots = db()->query($sql)->fetchAll(PDO::FETCH_ASSOC);
 
         foreach ($slots as &$slot) {
-            $slot['operators']      = [];
-            $slot['used_operators'] = [];
+            $slot['roaming_detail'] = [];
             $slot['is_promo']       = false;
             try {
-                // Operatori configurati per questa tessera
-                $rs = db()->prepare("SELECT operator_name FROM roaming_settings WHERE rfid_slot_id=? AND is_hidden=0 ORDER BY operator_name ASC");
-                $rs->execute([$slot['id']]);
-                $slot['operators'] = $rs->fetchAll(PDO::FETCH_COLUMN);
-
-                // Operatori effettivamente usati dall'utente con questa tessera
-                $tu = db()->prepare("
-                    SELECT DISTINCT operator_name FROM transactions
-                    WHERE user_id=? AND rfid_slot_id=?
-                      AND operator_name IS NOT NULL AND operator_name != ''
-                      AND status IN ('CONFIRMED','PENDING','IN PROGRESS')
-                    ORDER BY operator_name ASC
+                // Query unificata: usati (con conteggio) + forzati is_forced=1
+                $rs = db()->prepare("
+                    SELECT operator_name, SUM(usage_count) as usage_count
+                    FROM (
+                        SELECT t.operator_name, COUNT(*) as usage_count
+                        FROM transactions t
+                        WHERE t.rfid_slot_id = ? AND t.status = 'CONFIRMED'
+                          AND t.operator_name IS NOT NULL AND t.operator_name != 'N/D'
+                        GROUP BY t.operator_name
+                        UNION ALL
+                        SELECT rs2.operator_name, 0 as usage_count
+                        FROM roaming_settings rs2
+                        WHERE rs2.rfid_slot_id = ? AND rs2.is_forced = 1
+                    ) AS combined
+                    GROUP BY operator_name
+                    ORDER BY usage_count DESC, operator_name ASC
                 ");
-                $tu->execute([$user['id'], $slot['id']]);
-                $slot['used_operators'] = $tu->fetchAll(PDO::FETCH_COLUMN);
+                $rs->execute([$slot['id'], $slot['id']]);
+                $slot['roaming_detail'] = $rs->fetchAll(PDO::FETCH_ASSOC);
 
                 // Promo attiva oggi
                 if (!empty($slot['promo_from']) && !empty($slot['promo_to'])) {

@@ -822,47 +822,41 @@ input {
 .tg-bot-icon  { font-size: 18px; flex-shrink: 0; }
 .tg-bot-text  { flex: 1; font-size: 12px; font-weight: 600; line-height: 1.4; }
 .tg-bot-arrow { font-size: 18px; opacity: 0.7; flex-shrink: 0; }
-
 /* ==========================================
-   Slot disponibili nella dashboard
+   Chip operatori roaming — slot picker
    ========================================== */
-.dash-slots-section {
-  padding: 4px 15px 6px;
+.slot-roaming-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 5px;
 }
-.dash-slots-title {
-  font-size: 11px;
-  font-weight: 700;
+.roaming-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+  background: rgba(255,255,255,0.08);
   color: var(--text-muted);
-  letter-spacing: 1.5px;
-  text-transform: uppercase;
-  margin-bottom: 8px;
-}
-.dash-slot-card {
-  background: var(--bg-card);
-  border-radius: 12px;
-  padding: 10px 14px;
-  margin-bottom: 5px;
-}
-.dash-slot-name {
-  font-size: 13px;
-  font-weight: 700;
-  margin-bottom: 3px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
-}
-.dash-slot-ops {
+  border-radius: 20px;
+  padding: 2px 8px;
   font-size: 11px;
-  color: var(--text-muted);
+  font-weight: 600;
   white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
 }
-.dash-slot-used {
-  font-size: 11px;
+.roaming-chip.used {
+  background: rgba(76,175,80,0.15);
   color: #4CAF50;
-  margin-top: 2px;
-  white-space: nowrap;
-  overflow: hidden;
-  text-overflow: ellipsis;
+}
+.roaming-chip.more {
+  background: transparent;
+  color: var(--text-muted);
+  font-size: 10px;
+}
+.roaming-count {
+  background: rgba(76,175,80,0.3);
+  color: #4CAF50;
+  border-radius: 10px;
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: 900;
 }

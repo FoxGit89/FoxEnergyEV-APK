@@ -117,7 +117,6 @@ const app = {
       this.renderDashboard();
       this.renderSlots();
       this.showScreen('dashboard-screen');
-      this._initCarousel();
     } catch(e) { console.error(e); alert(`Errore:\n${e.message||'Connessione fallita.'}`); this.logout(); }
   },
 
@@ -139,7 +138,7 @@ const app = {
   },
 
   renderSlots() {
-    // Popola connect-slot-list (connect-screen)
+    // Popola solo la connect-screen (la dashboard ha solo il pulsante Collega)
     let canSync=false;
     const list=document.getElementById('connect-slot-list');
     if (list) {
@@ -155,7 +154,6 @@ const app = {
     }
     const syncBtn=document.getElementById('connect-proceed-btn');
     if (syncBtn) { if(canSync)syncBtn.classList.remove('hidden'); else syncBtn.classList.add('hidden'); }
-
   },
 
   openSlotPicker(slotNum) {
@@ -165,28 +163,28 @@ const app = {
     this.cards.forEach(card=>{
       const div=document.createElement('div'); div.className='sheet-item'; div.onclick=()=>this.selectCardForSlot(card);
 
-      // Operatori configurati (roaming_settings)
-      const allOps  = card.operators||[];
-      const opsLine = allOps.length
-        ? `<div class="slot-operators">🔌 ${allOps.slice(0,4).map(o=>this._esc(o)).join(' · ')}${allOps.length>4?' +'+(allOps.length-4):''}</div>`
-        : '';
-
-      // Operatori effettivamente usati dall'utente con questa tessera
-      const usedOps  = card.used_operators||[];
-      const usedLine = usedOps.length
-        ? `<div class="slot-used-ops">✅ Usata con: ${usedOps.slice(0,3).map(o=>this._esc(o)).join(', ')}${usedOps.length>3?' +'+(usedOps.length-3):''}</div>`
-        : '';
-
-      // Badge promo / sospesa
+      // Badge promo
       const promoBadge = card.is_promo ? `<span class="slot-promo-badge">PROMO</span>` : '';
-      const suspBadge  = card.status==='suspended' ? `<span class="slot-susp-badge">⚠️ Sospesa</span>` : '';
+
+      // Chip roaming: usati (verdi + conteggio) e forzati (grigi)
+      const roaming = card.roaming_detail || [];
+      let opsHtml = '';
+      if (roaming.length) {
+        const chips = roaming.slice(0,5).map(r => {
+          const n   = parseInt(r.usage_count)||0;
+          const cls = n > 0 ? 'roaming-chip used' : 'roaming-chip';
+          const cnt = n > 0 ? `<span class="roaming-count">${n}</span>` : '';
+          return `<span class="${cls}">${this._esc(r.operator_name)}${cnt}</span>`;
+        });
+        const more = roaming.length > 5 ? `<span class="roaming-chip more">+${roaming.length-5}</span>` : '';
+        opsHtml = `<div class="slot-roaming-row">${chips.join('')}${more}</div>`;
+      }
 
       div.innerHTML=`
         <div style="font-size:22px;color:var(--primary-orange);flex-shrink:0">💳</div>
         <div style="flex:1;min-width:0">
-          <div class="sheet-item-title">${this._esc(card.slot_label)}${promoBadge}${suspBadge}</div>
-          ${opsLine}
-          ${usedLine}
+          <div class="sheet-item-title">${this._esc(card.slot_label)}${promoBadge}</div>
+          ${opsHtml}
         </div>`;
       list.appendChild(div);
     });
@@ -216,28 +214,6 @@ const app = {
   _esc(s) {
     if (!s) return '';
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
-  },
-
-  // ── CAROSELLO ISTRUZIONI ──
-  _initCarousel() {
-    const carousel = document.getElementById('how-to-carousel');
-    const dots     = document.querySelectorAll('.how-to-dot');
-    if (!carousel || !dots.length) return;
-    let current = 0;
-    const total = carousel.querySelectorAll('.how-to-slide').length;
-    const update = (idx) => {
-      current = (idx + total) % total;
-      carousel.style.transform = `translateX(-${current * 100}%)`;
-      dots.forEach((d,i) => d.classList.toggle('active', i===current));
-    };
-    carousel.addEventListener('touchstart', e => { this._swipeX = e.touches[0].clientX; }, {passive:true});
-    carousel.addEventListener('touchend',   e => {
-      const dx = e.changedTouches[0].clientX - (this._swipeX||0);
-      if (Math.abs(dx) > 40) update(current + (dx < 0 ? 1 : -1));
-    }, {passive:true});
-    dots.forEach((d,i) => d.addEventListener('click', () => update(i)));
-    if (this._carouselTimer) clearInterval(this._carouselTimer);
-    this._carouselTimer = setInterval(() => update(current+1), 4000);
   },
 
   // ── PROFILO ──
