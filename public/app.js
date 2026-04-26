@@ -309,27 +309,48 @@ const app = {
 
       document.getElementById('map-loading-text').textContent = 'Caricamento colonnine...';
 
-      // Chiama OpenChargeMap API
+      // Chiama Overpass API (OpenStreetMap) — gratuita, nessuna key, CORS ok
       try {
-        const ocmUrl = `https://api.openchargemap.io/v3/poi/?output=json&latitude=${lat}&longitude=${lng}&distance=5&distanceunit=km&maxresults=30&compact=true&verbose=false`;
-        const resp = await fetch(ocmUrl);
-        const pois = await resp.json();
+        // Raggio 5km attorno alla posizione
+        const radius = 5000;
+        const query = `[out:json][timeout:15];
+          (
+            node["amenity"="charging_station"](around:${radius},${lat},${lng});
+            way["amenity"="charging_station"](around:${radius},${lat},${lng});
+          );
+          out center 30;`;
+        const resp = await fetch('https://overpass-api.de/api/interpreter', {
+          method: 'POST',
+          body: query,
+          headers: { 'Content-Type': 'text/plain' },
+        });
+        const data = await resp.json();
+
+        // Normalizza in formato simile a OCM
+        const pois = data.elements.map(el => ({
+          id: el.id,
+          lat: el.lat || el.center?.lat,
+          lng: el.lon || el.center?.lon,
+          name: el.tags?.name || el.tags?.['operator'] || 'Colonnina',
+          operator: el.tags?.operator || el.tags?.['brand'] || '',
+          network: el.tags?.network || '',
+          socket: el.tags?.['socket:type2'] || el.tags?.['socket:chademo'] || '',
+          maxpower: el.tags?.['maxpower'] || el.tags?.['capacity'] || '',
+        })).filter(p => p.lat && p.lng);
 
         // Rimuovi marker colonnine precedenti
         if (this._stationMarkers) this._stationMarkers.forEach(m => m.remove());
         this._stationMarkers = [];
 
         pois.forEach(poi => {
-          const pLat = poi.AddressInfo?.Latitude;
-          const pLng = poi.AddressInfo?.Longitude;
+          const pLat = poi.lat;
+          const pLng = poi.lng;
           if (!pLat || !pLng) return;
 
-          const opTitle = (poi.OperatorInfo?.Title || '').toLowerCase();
-          const address = poi.AddressInfo?.Title || '';
-          const town    = poi.AddressInfo?.Town || '';
-          const conns   = (poi.Connections || []).map(c =>
-            `${c.ConnectionType?.Title || '?'} ${c.PowerKW ? c.PowerKW+'kW' : ''}`
-          ).filter(Boolean).join(', ');
+          const opTitle = (poi.operator + ' ' + poi.network + ' ' + poi.name).toLowerCase();
+          const address = poi.name;
+          const town    = '';
+          const conns   = poi.socket ? poi.socket.replace('yes','').trim() : '';
 
           // Matching: cerca se uno dei nomi operatori dell'utente è contenuto nel titolo OCM
           const matchedCards = [];
@@ -354,7 +375,7 @@ const app = {
           let popupHtml = `<div style="min-width:180px;font-family:sans-serif">`;
           popupHtml += `<b style="font-size:13px">${icon} ${this._esc(address)}</b>`;
           if (town) popupHtml += `<div style="color:#666;font-size:11px">${this._esc(town)}</div>`;
-          if (poi.OperatorInfo?.Title) popupHtml += `<div style="margin-top:4px;font-size:12px">🏢 ${this._esc(poi.OperatorInfo.Title)}</div>`;
+          if (poi.operator) popupHtml += `<div style="margin-top:4px;font-size:12px">🏢 ${this._esc(poi.operator)}</div>`;
           if (conns) popupHtml += `<div style="font-size:11px;color:#555">🔌 ${this._esc(conns)}</div>`;
           if (hasMatch) {
             popupHtml += `<div style="margin-top:8px;padding:6px 8px;background:#E8F5E9;border-radius:6px;font-size:12px">`;
