@@ -920,3 +920,35 @@ input {
   padding: 6px 0 0;
   background: transparent;
 }
+
+/* ==========================================
+   Mappa colonnine
+   ========================================== */
+#map-screen .app-header { flex-shrink: 0; }
+#leaflet-map .leaflet-popup-content { margin: 10px 14px; }
+.map-legend {
+  position: absolute;
+  bottom: 24px;
+  left: 10px;
+  background: rgba(0,0,0,0.75);
+  border-radius: 10px;
+  padding: 8px 12px;
+  z-index: 999;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+.map-legend-item {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  font-size: 12px;
+  color: white;
+}
+.map-dot {
+  width: 10px; height: 10px;
+  border-radius: 50%;
+  flex-shrink: 0;
+}
+.map-dot.green { background: #4CAF50; }
+.map-dot.grey  { background: #9E9E9E; }
