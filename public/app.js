@@ -14,12 +14,48 @@ const app = {
   mapping:   { 1:null, 2:null, 3:null, 4:null, 5:null, 6:null, 7:null, 8:null },
   currentSlotSelection: null,
 
+  _isChrome() {
+    const ua = navigator.userAgent;
+    const isChrome = /Chrome\//.test(ua) && !/Edg\//.test(ua) && !/OPR\//.test(ua) && !/SamsungBrowser\//.test(ua);
+    const hasBluetooth = !!navigator.bluetooth;
+    return isChrome && hasBluetooth;
+  },
+
   init() {
+    // Verifica Chrome con Web Bluetooth prima di tutto
+    if (!this._isChrome()) {
+      this._showBrowserError();
+      return;
+    }
     if (this.user.telegramId) this.checkLicenseAndBoot();
     else this.showScreen('login-screen');
     document.getElementById('slot-picker').addEventListener('click', (e) => {
       if (e.target.id === 'slot-picker') this.hideSlotPicker();
     });
+  },
+
+  _showBrowserError() {
+    // Mostra schermata di errore browser al posto del login
+    document.body.innerHTML = `
+      <div style="
+        min-height:100vh; background:#111; display:flex; flex-direction:column;
+        align-items:center; justify-content:center; text-align:center; padding:30px;
+        font-family:-apple-system,sans-serif; color:white;">
+        <div style="font-size:72px;margin-bottom:24px">🦊</div>
+        <h1 style="font-size:22px;font-weight:900;margin-bottom:12px">Browser non supportato</h1>
+        <p style="color:rgba(255,255,255,0.65);font-size:15px;line-height:1.7;max-width:320px;margin-bottom:32px">
+          FoxSync richiede <strong>Google Chrome</strong> su Android per il supporto Bluetooth.<br><br>
+          Apri questa pagina con Chrome e riprova.
+        </p>
+        <a href="https://play.google.com/store/apps/details?id=com.android.chrome"
+           style="background:#FF9800;color:white;padding:14px 28px;border-radius:14px;
+                  text-decoration:none;font-weight:700;font-size:15px;letter-spacing:0.5px">
+          Scarica Google Chrome
+        </a>
+        <p style="color:rgba(255,255,255,0.35);font-size:12px;margin-top:24px">
+          foxsync.cards
+        </p>
+      </div>`;
   },
 
   showScreen(id) {
@@ -222,6 +258,130 @@ const app = {
   _esc(s) {
     if (!s) return '';
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  },
+
+  // ── MAPPA COLONNINE ──
+  async showMap() {
+    app.showScreen('map-screen');
+    document.getElementById('map-loading').style.display = 'flex';
+    document.getElementById('map-loading-text').textContent = 'Rilevamento posizione...';
+
+    // Raccogli tutti gli operator_name dalle tessere dell'utente
+    const userOps = [];
+    const cardToOps = {}; // operatore → lista tessere
+    (this.cards || []).forEach(card => {
+      (card.roaming_detail || []).forEach(r => {
+        const op = r.operator_name.toLowerCase();
+        userOps.push(op);
+        if (!cardToOps[op]) cardToOps[op] = [];
+        cardToOps[op].push(card.slot_label);
+      });
+    });
+
+    // Inizializza mappa Leaflet (una sola volta)
+    if (!this._map) {
+      this._map = L.map('leaflet-map', { zoomControl: true });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '© OpenStreetMap',
+        maxZoom: 18,
+      }).addTo(this._map);
+    }
+
+    // Ottieni posizione utente
+    if (!navigator.geolocation) {
+      document.getElementById('map-loading-text').textContent = 'GPS non disponibile';
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(async (pos) => {
+      const lat = pos.coords.latitude;
+      const lng = pos.coords.longitude;
+
+      // Centra mappa sull'utente
+      this._map.setView([lat, lng], 14);
+
+      // Marker posizione utente
+      if (this._userMarker) this._userMarker.remove();
+      this._userMarker = L.circleMarker([lat, lng], {
+        radius: 10, fillColor: '#FF9800', color: '#fff',
+        weight: 3, opacity: 1, fillOpacity: 1,
+      }).addTo(this._map).bindPopup('📍 Sei qui');
+
+      document.getElementById('map-loading-text').textContent = 'Caricamento colonnine...';
+
+      // Chiama OpenChargeMap API
+      try {
+        const ocmUrl = `https://api.openchargemap.io/v3/poi/?output=json&latitude=${lat}&longitude=${lng}&distance=5&distanceunit=km&maxresults=30&compact=true&verbose=false`;
+        const resp = await fetch(ocmUrl);
+        const pois = await resp.json();
+
+        // Rimuovi marker colonnine precedenti
+        if (this._stationMarkers) this._stationMarkers.forEach(m => m.remove());
+        this._stationMarkers = [];
+
+        pois.forEach(poi => {
+          const pLat = poi.AddressInfo?.Latitude;
+          const pLng = poi.AddressInfo?.Longitude;
+          if (!pLat || !pLng) return;
+
+          const opTitle = (poi.OperatorInfo?.Title || '').toLowerCase();
+          const address = poi.AddressInfo?.Title || '';
+          const town    = poi.AddressInfo?.Town || '';
+          const conns   = (poi.Connections || []).map(c =>
+            `${c.ConnectionType?.Title || '?'} ${c.PowerKW ? c.PowerKW+'kW' : ''}`
+          ).filter(Boolean).join(', ');
+
+          // Matching: cerca se uno dei nomi operatori dell'utente è contenuto nel titolo OCM
+          const matchedCards = [];
+          userOps.forEach(op => {
+            if (opTitle.includes(op) || op.includes(opTitle.split(' ')[0])) {
+              (cardToOps[op] || []).forEach(card => {
+                if (!matchedCards.includes(card)) matchedCards.push(card);
+              });
+            }
+          });
+
+          const hasMatch = matchedCards.length > 0;
+          const color    = hasMatch ? '#4CAF50' : '#9E9E9E';
+          const icon     = hasMatch ? '⚡' : '🔌';
+
+          const marker = L.circleMarker([pLat, pLng], {
+            radius: hasMatch ? 10 : 7,
+            fillColor: color, color: '#fff',
+            weight: 2, opacity: 1, fillOpacity: 0.9,
+          }).addTo(this._map);
+
+          let popupHtml = `<div style="min-width:180px;font-family:sans-serif">`;
+          popupHtml += `<b style="font-size:13px">${icon} ${this._esc(address)}</b>`;
+          if (town) popupHtml += `<div style="color:#666;font-size:11px">${this._esc(town)}</div>`;
+          if (poi.OperatorInfo?.Title) popupHtml += `<div style="margin-top:4px;font-size:12px">🏢 ${this._esc(poi.OperatorInfo.Title)}</div>`;
+          if (conns) popupHtml += `<div style="font-size:11px;color:#555">🔌 ${this._esc(conns)}</div>`;
+          if (hasMatch) {
+            popupHtml += `<div style="margin-top:8px;padding:6px 8px;background:#E8F5E9;border-radius:6px;font-size:12px">`;
+            popupHtml += `<b style="color:#2E7D32">✅ Usa queste tessere:</b><br>`;
+            matchedCards.forEach(c => { popupHtml += `• ${this._esc(c)}<br>`; });
+            popupHtml += `</div>`;
+          } else {
+            popupHtml += `<div style="margin-top:6px;font-size:11px;color:#999">Operatore non verificato nelle tue tessere</div>`;
+          }
+          popupHtml += `</div>`;
+
+          marker.bindPopup(popupHtml);
+          this._stationMarkers.push(marker);
+        });
+
+        document.getElementById('map-loading').style.display = 'none';
+        // Forza ridisegno mappa (necessario quando il div era hidden)
+        setTimeout(() => this._map.invalidateSize(), 100);
+
+      } catch(e) {
+        document.getElementById('map-loading-text').textContent = 'Errore caricamento colonnine';
+        console.error('[MAP]', e);
+      }
+
+    }, (err) => {
+      document.getElementById('map-loading-text').textContent = 'Permesso GPS negato';
+    }, { timeout: 10000, enableHighAccuracy: false });
   },
 
   // ── CAROSELLO ──
@@ -593,7 +753,18 @@ const secureSession = {
     });
     // SICUREZZA: blocca navigazione browser durante sessione attiva
     window.addEventListener('beforeunload', this._onUnload=e=>{
-      if (!this._wiping && this._startedAt) { e.preventDefault(); e.returnValue='Sessione attiva! Premi "Cancella ora" prima di uscire.'; }
+      if (!this._wiping && this._startedAt) {
+        e.preventDefault();
+        e.returnValue='Sessione attiva! Premi "Cancella ora" prima di uscire.';
+        // Tenta comunque di registrare la chiusura forzata
+        this._sendEndSession('ble_lost');
+      }
+    });
+    // pagehide: più affidabile su mobile quando l'app viene killata/swipata via
+    window.addEventListener('pagehide', this._onPageHide=()=>{
+      if (!this._wiping && this._startedAt) {
+        this._sendEndSession('ble_lost');
+      }
     });
     // SICUREZZA: intercetta tasto Back Android (history.back)
     history.pushState(null, '', location.href);
@@ -654,13 +825,32 @@ const secureSession = {
     const n=document.getElementById('session-countdown-num');if(n)n.textContent=r;
   },
 
+  // Invia end_session con sendBeacon (funziona anche se browser viene killato)
+  _sendEndSession(reason) {
+    const uid = app.user?.telegramId;
+    if (!uid) return;
+    const url = `${window.location.origin}/app_api.php?action=end_session&user_id=${encodeURIComponent(uid)}&reason=${encodeURIComponent(reason)}`;
+    // sendBeacon garantisce la consegna anche durante beforeunload/pagehide
+    if (navigator.sendBeacon) {
+      navigator.sendBeacon(url);
+    } else {
+      // fallback sincrono XHR (legacy)
+      try {
+        const xhr = new XMLHttpRequest();
+        xhr.open('GET', url, false); // sincrono
+        xhr.send();
+      } catch(e) {}
+    }
+  },
+
   async cancel(reason) {
     if (this._wiping) return;
     this._wiping=true;
     if (this._timer){clearInterval(this._timer);this._timer=null;}
-    if (this._onVis) document.removeEventListener('visibilitychange',this._onVis);
-    if (this._onUnload) window.removeEventListener('beforeunload',this._onUnload);
-    if (this._onPop)    window.removeEventListener('popstate',this._onPop);
+    if (this._onVis)      document.removeEventListener('visibilitychange',this._onVis);
+    if (this._onUnload)   window.removeEventListener('beforeunload',this._onUnload);
+    if (this._onPop)      window.removeEventListener('popstate',this._onPop);
+    if (this._onPageHide) window.removeEventListener('pagehide',this._onPageHide);
     const overlay=document.getElementById('session-block-overlay'); if(overlay)overlay.remove();
     document.getElementById('session-cancel-btn').disabled=true;
     app.showScreen('wipe-screen');
@@ -673,13 +863,13 @@ const secureSession = {
     try {
       await bleEngine.wipeAllSlots(setWipe);
       if(navigator.vibrate)navigator.vibrate([100,50,200]);
-      app.apiCall({ action: 'end_session', user_id: app.user.telegramId, reason: reason }).catch(()=>{});
+      this._sendEndSession(reason);
       setWipe('🦊✅','DISPOSITIVO PULITO','Tutti gli slot sono stati cancellati. Arrivederci!');
       setTimeout(()=>{this._wiping=false;app.showScreen('dashboard-screen');},2000);
     } catch(err) {
       console.error('[WIPE ERROR]',err);
       // BLE perso: notifica admin e logout sicuro
-      app.apiCall({ action: 'end_session', user_id: app.user.telegramId, reason: 'ble_lost' }).catch(() => {});
+      secureSession._sendEndSession('ble_lost');
       app.apiCall({
         action: 'notify_admin',
         user_id: app.user.telegramId,

@@ -83,6 +83,26 @@ try {
     // 2.5 DASHBOARD FINANZIARIA & STORICO TRANSAZIONI
     // =========================================================
     if ($action === 'get_dashboard') {
+        // Cleanup sessioni orfane: active da > 10 min senza slot caricati (connessione non completata)
+        // oppure active da > 5 min con slot caricati (sessione 60s + margine generoso)
+        try {
+            db()->exec("
+                UPDATE chameleon_sessions
+                SET status='expired', ended_at=NOW(),
+                    duration_sec=TIMESTAMPDIFF(SECOND, started_at, NOW()),
+                    end_reason='expired'
+                WHERE status='active'
+                  AND (
+                      (slots_loaded IS NULL OR slots_loaded = '')
+                      AND started_at < DATE_SUB(NOW(), INTERVAL 10 MINUTE)
+                  )
+                  OR (
+                      status='active'
+                      AND started_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+                  )
+            ");
+        } catch(Exception $e) {}
+
         try {
             if (!function_exists('getUserMonthlyStats')) {
                 echo json_encode(['error' => 'La funzione getUserMonthlyStats() manca in functions.php!']);
@@ -370,12 +390,87 @@ try {
         if ($action === 'start_session') {
             $slots = $_GET['slots'] ?? '';
             try {
-                db()->prepare("
+                // Chiudi sessioni precedenti ancora aperte
+                $exp_stmt = db()->prepare("
                     UPDATE chameleon_sessions
                     SET status='expired', ended_at=NOW(),
                         duration_sec=TIMESTAMPDIFF(SECOND, started_at, NOW())
                     WHERE user_id=? AND status='active'
-                ")->execute([$user_id]);
+                ");
+                $exp_stmt->execute([$user_id]);
+                $expired_count = $exp_stmt->rowCount();
+
+                // Se c'era una sessione attiva scaduta → controlla anomalie
+                if ($expired_count > 0) {
+                    try {
+                        $exp_sess = db()->prepare("
+                            SELECT duration_sec, slots_loaded
+                            FROM chameleon_sessions
+                            WHERE user_id=? AND status='expired'
+                            ORDER BY ended_at DESC LIMIT 1
+                        ");
+                        $exp_sess->execute([$user_id]);
+                        $es = $exp_sess->fetch(PDO::FETCH_ASSOC);
+
+                        if ($es) {
+                            $dur    = (int)($es['duration_sec'] ?? 0);
+                            $uname  = '@' . ($user['username'] ?? $user_id);
+                            $token  = getenv('BOT_TOKEN');
+                            $alerts = [];
+
+                            // Sessione molto lunga (> 120s = 2 min) senza chiusura regolare
+                            if ($dur > 120) {
+                                $alerts[] = "⏳ Sessione durata {$dur}s senza chiusura regolare (app killata?)";
+                            }
+                            // Sessione scaduta con slot caricati
+                            if (!empty($es['slots_loaded'])) {
+                                $alerts[] = "💾 Slot erano caricati: " . $es['slots_loaded'];
+                            }
+
+                            if (!empty($alerts) && $token) {
+                                // Log admin
+                                $log = "Sessione EXPIRED senza chiusura | {$uname} | {$dur}s | " . implode(' | ', $alerts);
+                                try {
+                                    db()->prepare("INSERT INTO system_logs (level,context,user_id,message) VALUES ('WARNING','FoxSync',?,?)")
+                                        ->execute([$user['id']??null, $log]);
+                                } catch(Exception $e) {}
+
+                                // Notifica admin
+                                $tg  = "🦊 <b>SESSIONE NON CHIUSA REGOLARMENTE</b>
+";
+                                $tg .= "👤 {$uname} (ID:{$user_id})
+";
+                                $tg .= "⏱ Durata: {$dur}s
+
+";
+                                foreach ($alerts as $a) $tg .= "• {$a}
+";
+                                $tg .= "
+⚠️ Probabile chiusura forzata dell'app";
+                                try {
+                                    $admins = db()->query("SELECT chat_id FROM admin_users WHERE chat_id IS NOT NULL AND chat_id!=''")->fetchAll(PDO::FETCH_COLUMN);
+                                    foreach ($admins as $cid)
+                                        @file_get_contents("https://api.telegram.org/bot{$token}/sendMessage?chat_id=".urlencode($cid)."&text=".urlencode($tg)."&parse_mode=HTML");
+                                } catch(Exception $e) {}
+
+                                // Notifica utente
+                                $tg_u  = "⚠️ <b>FoxSync — Sessione interrotta</b>
+
+";
+                                $tg_u .= "La tua sessione Chameleon non è stata chiusa correttamente.
+
+";
+                                $tg_u .= "I log verranno verificati dagli amministratori.
+";
+                                $tg_u .= "Se hai usato le tessere, ricordati di <b>dichiarare il consumo</b> dal bot.";
+                                try {
+                                    if (!empty($user['telegram_id']))
+                                        @file_get_contents("https://api.telegram.org/bot{$token}/sendMessage?chat_id=".urlencode($user['telegram_id'])."&text=".urlencode($tg_u)."&parse_mode=HTML");
+                                } catch(Exception $e) {}
+                            }
+                        }
+                    } catch(Exception $e) {}
+                }
 
                 $lat = !empty($_GET['lat']) ? (float)$_GET['lat'] : null;
                 $lng = !empty($_GET['lng']) ? (float)$_GET['lng'] : null;
