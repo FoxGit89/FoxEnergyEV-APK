@@ -92,11 +92,25 @@ try {
             // Calcola le statistiche mensili
             $stats = getUserMonthlyStats($user_id);
 
+            // Conteggio messaggi broadcast ultimi 7 giorni
+            $unread_bc = 0;
+            try {
+                $bc = db()->prepare("
+                    SELECT COUNT(*) FROM scheduled_broadcasts
+                    WHERE status='COMPLETED'
+                      AND (target_level IS NULL OR target_level='' OR target_level=? OR target_level='all')
+                      AND scheduled_at >= DATE_SUB(NOW(), INTERVAL 7 DAY)
+                ");
+                $bc->execute([$user['loyalty_level'] ?? '']);
+                $unread_bc = (int)$bc->fetchColumn();
+            } catch(Exception $e) {}
+
             echo json_encode([
-                'saldo' => $user['saldo_kwh'] ?? 0,
-                'karma' => $user['trust_score'] ?? 0,
-                'is_premium' => $user['is_premium'] ?? 0,
-                'monthly_stats' => $stats
+                'saldo'             => $user['saldo_kwh'] ?? 0,
+                'karma'             => $user['trust_score'] ?? 0,
+                'is_premium'        => $user['is_premium'] ?? 0,
+                'monthly_stats'     => $stats,
+                'unread_broadcasts' => $unread_bc,
             ]);
             exit;
 
@@ -327,10 +341,23 @@ try {
                 end_reason   ENUM('manual','auto','ble_lost','expired') DEFAULT NULL,
                 status       ENUM('active','ended','ble_lost','expired') NOT NULL DEFAULT 'active',
                 ip_address   VARCHAR(45) DEFAULT NULL,
+                latitude     DECIMAL(10,6) DEFAULT NULL,
+                longitude    DECIMAL(10,6) DEFAULT NULL,
+                geo_accuracy INT DEFAULT NULL,
                 INDEX idx_user (user_id),
                 INDEX idx_started (started_at),
                 INDEX idx_status (status)
             ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
+            // Migrazione: aggiunge colonne geo se tabella esiste già senza
+            try {
+                $cols = db()->query("SHOW COLUMNS FROM chameleon_sessions LIKE 'latitude'")->fetchAll();
+                if (empty($cols)) {
+                    db()->exec("ALTER TABLE chameleon_sessions
+                        ADD COLUMN latitude DECIMAL(10,6) DEFAULT NULL AFTER ip_address,
+                        ADD COLUMN longitude DECIMAL(10,6) DEFAULT NULL AFTER latitude,
+                        ADD COLUMN geo_accuracy INT DEFAULT NULL AFTER longitude");
+                }
+            } catch(Exception $e) {}
         } catch(Exception $e) {}
 
         $ip = '';
@@ -350,17 +377,24 @@ try {
                     WHERE user_id=? AND status='active'
                 ")->execute([$user_id]);
 
+                $lat = !empty($_GET['lat']) ? (float)$_GET['lat'] : null;
+                $lng = !empty($_GET['lng']) ? (float)$_GET['lng'] : null;
+                $acc = !empty($_GET['acc']) ? (int)$_GET['acc']   : null;
+
                 $stmt = db()->prepare("
                     INSERT INTO chameleon_sessions
-                        (user_id, username, telegram_id, slots_loaded, status, ip_address)
-                    VALUES (?, ?, ?, ?, 'active', ?)
+                        (user_id, username, telegram_id, slots_loaded, status, ip_address, latitude, longitude, geo_accuracy)
+                    VALUES (?, ?, ?, ?, 'active', ?, ?, ?, ?)
                 ");
                 $stmt->execute([
                     $user_id,
                     $user['username'] ?? null,
                     $user['telegram_id'] ?? $user_id,
                     $slots,
-                    $ip
+                    $ip,
+                    $lat,
+                    $lng,
+                    $acc,
                 ]);
                 $new_session_id = (int)db()->lastInsertId();
             } catch(Exception $e) {}
@@ -368,6 +402,7 @@ try {
         } else {
             $reason = $_GET['reason'] ?? 'manual';
             if (!in_array($reason, ['manual','auto','ble_lost','expired'])) $reason = 'manual';
+            $slots_used = '';
             try {
                 db()->prepare("
                     UPDATE chameleon_sessions
@@ -375,6 +410,60 @@ try {
                         duration_sec=TIMESTAMPDIFF(SECOND, started_at, NOW())
                     WHERE user_id=? AND status='active'
                 ")->execute([$reason, $user_id]);
+
+                // Leggi la sessione appena chiusa per il riassunto
+                $sess_row = db()->prepare("
+                    SELECT slots_loaded, duration_sec, started_at, ended_at
+                    FROM chameleon_sessions
+                    WHERE user_id=? AND status='ended'
+                    ORDER BY ended_at DESC LIMIT 1
+                ");
+                $sess_row->execute([$user_id]);
+                $closed = $sess_row->fetch(PDO::FETCH_ASSOC);
+
+                if ($closed && !empty($closed['slots_loaded'])) {
+                    $slots_used = $closed['slots_loaded'];
+                    $dur        = (int)($closed['duration_sec'] ?? 0);
+                    $started    = !empty($closed['started_at'])
+                        ? date('H:i', strtotime($closed['started_at']))
+                        : '—';
+                    $ended      = !empty($closed['ended_at'])
+                        ? date('H:i', strtotime($closed['ended_at']))
+                        : date('H:i');
+
+                    $reason_label = match($reason) {
+                        'manual'   => 'Cancellazione manuale',
+                        'auto'     => 'Timer 60s scaduto',
+                        'ble_lost' => 'Bluetooth disconnesso',
+                        default    => $reason,
+                    };
+
+                    $token = getenv('BOT_TOKEN');
+                    if ($token && !empty($user['telegram_id'])) {
+                        $msg  = "🦊 <b>FoxSync — Riepilogo Sessione</b>
+
+";
+                        $msg .= "⏱ <b>Durata:</b> {$dur}s ({$started} → {$ended})
+";
+                        $msg .= "💾 <b>Tessere usate:</b>
+";
+                        foreach (explode(',', $slots_used) as $slot) {
+                            $msg .= "   • " . trim($slot) . "
+";
+                        }
+                        $msg .= "
+📋 <b>Chiusura:</b> {$reason_label}
+
+";
+                        $msg .= "➡️ Ricordati di <b>dichiarare il consumo</b> dal bot se hai effettuato una ricarica!";
+                        @file_get_contents(
+                            "https://api.telegram.org/bot{$token}/sendMessage"
+                            . "?chat_id=" . urlencode($user['telegram_id'])
+                            . "&text="    . urlencode($msg)
+                            . "&parse_mode=HTML"
+                        );
+                    }
+                }
             } catch(Exception $e) {}
         }
 

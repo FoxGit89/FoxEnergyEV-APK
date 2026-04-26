@@ -129,6 +129,13 @@ const app = {
     document.getElementById('dash-card').className = 'dashboard-card'+(isPrem?' premium':'')+(isLow?' low-balance':'');
     document.getElementById('dash-premium-badge').textContent = isPrem?'FOX PREMIUM CLUB':'UTENTE STANDARD';
     const w=document.getElementById('dash-warning'); if(isLow)w.classList.remove('hidden'); else w.classList.add('hidden');
+    // Badge messaggi non letti (ultimi 7gg)
+    const bcBadge = document.getElementById('broadcasts-badge');
+    if (bcBadge) {
+      const n = this.dashboard.unread_broadcasts || 0;
+      if (n > 0) { bcBadge.textContent = n > 9 ? '9+' : n; bcBadge.classList.remove('hidden'); }
+      else bcBadge.classList.add('hidden');
+    }
     const mn=['Gennaio','Febbraio','Marzo','Aprile','Maggio','Giugno','Luglio','Agosto','Settembre','Ottobre','Novembre','Dicembre'];
     document.getElementById('stats-month').textContent = mn[new Date().getMonth()];
     if (this.dashboard.monthly_stats) {
@@ -444,6 +451,29 @@ const app = {
   // Avvia connessione BLE, legge stato slot, mostra dashboard con slot attuali
   startConnectFlow() {
     if (!navigator.bluetooth) { alert('Web Bluetooth non supportato.\nUsa Chrome su Android.'); return; }
+
+    // Verifica connessione internet
+    if (!navigator.onLine) {
+      alert('⚠️ Nessuna connessione internet.\n\nFoxSync richiede internet attivo per registrare la sessione e garantire la sicurezza.\nConnettiti e riprova.');
+      return;
+    }
+
+    // Richiedi geolocalizzazione (silente, non bloccante)
+    this._pendingGeoLocation = null;
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(
+        pos => {
+          this._pendingGeoLocation = {
+            lat: pos.coords.latitude.toFixed(6),
+            lng: pos.coords.longitude.toFixed(6),
+            acc: Math.round(pos.coords.accuracy),
+          };
+        },
+        () => { this._pendingGeoLocation = null; }, // negato o non disponibile: procede comunque
+        { timeout: 8000, maximumAge: 60000, enableHighAccuracy: false }
+      );
+    }
+
     this.showScreen('connect-screen');
     bleEngine.connectAndRead(this.user.telegramId);
   },
@@ -844,10 +874,14 @@ window.bleEngine = {
       if(navigator.vibrate)navigator.vibrate([100,50,100]);
       await new Promise(r=>setTimeout(r,800));
       // Registra apertura sessione nel DB e aggancia lo snapshot
+      const geo = app._pendingGeoLocation || {};
       app.apiCall({
         action:  'start_session',
         user_id: telegramId,
         slots:   loadedLabels.join(','),
+        lat:     geo.lat || '',
+        lng:     geo.lng || '',
+        acc:     geo.acc || '',
       }).then(res => {
         const sessionId = res?.session_id;
         // Salva snapshot con session_id se disponibile
