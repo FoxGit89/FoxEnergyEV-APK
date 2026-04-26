@@ -117,6 +117,7 @@ const app = {
       this.renderDashboard();
       this.renderSlots();
       this.showScreen('dashboard-screen');
+      this._initCarousel();
     } catch(e) { console.error(e); alert(`Errore:\n${e.message||'Connessione fallita.'}`); this.logout(); }
   },
 
@@ -155,33 +156,6 @@ const app = {
     const syncBtn=document.getElementById('connect-proceed-btn');
     if (syncBtn) { if(canSync)syncBtn.classList.remove('hidden'); else syncBtn.classList.add('hidden'); }
 
-    // Popola sezione slot nella dashboard (con operatori)
-    this._renderDashSlots();
-  },
-
-  _renderDashSlots() {
-    const section = document.getElementById('dash-slots-section');
-    if (!section || !this.cards || !this.cards.length) return;
-    section.classList.remove('hidden');
-    section.innerHTML = `<div class="dash-slots-title">💾 Tessere disponibili</div>` +
-      this.cards.map(card => {
-        const allOps  = card.operators||[];
-        const usedOps = card.used_operators||[];
-        const promo   = card.is_promo ? `<span class="slot-promo-badge">PROMO</span>` : '';
-
-        const opsHtml = allOps.length
-          ? `<div class="dash-slot-ops">🔌 ${allOps.slice(0,3).map(o=>this._esc(o)).join(' · ')}${allOps.length>3?' +'+(allOps.length-3):''}</div>`
-          : '';
-        const usedHtml = usedOps.length
-          ? `<div class="dash-slot-used">✅ ${usedOps.slice(0,2).map(o=>this._esc(o)).join(', ')}${usedOps.length>2?' +'+(usedOps.length-2):''}</div>`
-          : '';
-
-        return `<div class="dash-slot-card">
-          <div class="dash-slot-name">${this._esc(card.slot_label)}${promo}</div>
-          ${opsHtml}
-          ${usedHtml}
-        </div>`;
-      }).join('');
   },
 
   openSlotPicker(slotNum) {
@@ -242,6 +216,28 @@ const app = {
   _esc(s) {
     if (!s) return '';
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  },
+
+  // ── CAROSELLO ISTRUZIONI ──
+  _initCarousel() {
+    const carousel = document.getElementById('how-to-carousel');
+    const dots     = document.querySelectorAll('.how-to-dot');
+    if (!carousel || !dots.length) return;
+    let current = 0;
+    const total = carousel.querySelectorAll('.how-to-slide').length;
+    const update = (idx) => {
+      current = (idx + total) % total;
+      carousel.style.transform = `translateX(-${current * 100}%)`;
+      dots.forEach((d,i) => d.classList.toggle('active', i===current));
+    };
+    carousel.addEventListener('touchstart', e => { this._swipeX = e.touches[0].clientX; }, {passive:true});
+    carousel.addEventListener('touchend',   e => {
+      const dx = e.changedTouches[0].clientX - (this._swipeX||0);
+      if (Math.abs(dx) > 40) update(current + (dx < 0 ? 1 : -1));
+    }, {passive:true});
+    dots.forEach((d,i) => d.addEventListener('click', () => update(i)));
+    if (this._carouselTimer) clearInterval(this._carouselTimer);
+    this._carouselTimer = setInterval(() => update(current+1), 4000);
   },
 
   // ── PROFILO ──

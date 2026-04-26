@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>FoxSync by Fox Energy EV</title>
   <meta name="theme-color" content="#FF9800">
-  <link rel="manifest" href="manifest.json?v=52">
-  <link rel="stylesheet" href="style.css?v=52">
+  <link rel="manifest" href="manifest.json?v=53">
+  <link rel="stylesheet" href="style.css?v=53">
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/index.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/Crypto1.global.js"></script>
   <script src="https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/plugin/WebbleAdapter.global.js"></script>
@@ -83,8 +83,39 @@
       <span class="tg-bot-arrow">›</span>
     </a>
 
-    <!-- Slot disponibili -->
-    <div id="dash-slots-section" class="dash-slots-section hidden"></div>
+    <!-- Istruzioni a carosello -->
+    <div class="how-to-section">
+      <div class="how-to-carousel-wrap">
+        <div class="how-to-carousel" id="how-to-carousel">
+          <div class="how-to-slide">
+            <div class="slide-num">1</div>
+            <div class="slide-title">🦊 Collega il Chameleon</div>
+            <div class="slide-desc">Premi il pulsante. Il dispositivo viene pulito e puoi scegliere le tessere da caricare.</div>
+          </div>
+          <div class="how-to-slide">
+            <div class="slide-num">2</div>
+            <div class="slide-title">🦊 Seleziona e sincronizza</div>
+            <div class="slide-desc">Assegna le tessere RFID agli slot e avvia la sincronizzazione.</div>
+          </div>
+          <div class="how-to-slide">
+            <div class="slide-num">3</div>
+            <div class="slide-title">🦊 Usa — hai 60 secondi</div>
+            <div class="slide-desc">Avvicinati alla colonnina. Alla scadenza gli slot vengono cancellati in automatico.</div>
+          </div>
+          <div class="how-to-slide warn">
+            <div class="slide-num">⚠️</div>
+            <div class="slide-title">Tieni il telefono vicino</div>
+            <div class="slide-desc">Non chiudere l'app. Se BT si disconnette gli admin vengono avvisati.</div>
+          </div>
+        </div>
+      </div>
+      <div class="how-to-dots" id="how-to-dots">
+        <span class="how-to-dot active"></span>
+        <span class="how-to-dot"></span>
+        <span class="how-to-dot"></span>
+        <span class="how-to-dot"></span>
+      </div>
+    </div>
 
     <!-- Pulsante unico grande centrato -->
     <div class="bottom-bar">
@@ -274,6 +305,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=52"></script>
+  <script src="app.js?v=53"></script>
 </body>
 </html>
