@@ -1088,11 +1088,7 @@ input {
   display:flex; align-items:center; gap:5px;
   font-size:9px; color:rgba(255,255,255,0.35);
 }
-.dash-gestori-dot {
-  width:9px; height:9px; border-radius:3px;
-}
-.dash-gestori-dot.used { background:linear-gradient(135deg,#1565C0,#1E88E5); }
-.dash-gestori-dot.new  { background:rgba(255,255,255,0.08); border:0.5px solid rgba(255,255,255,0.15); }
+.dash-gestori-dot.new { background:rgba(255,255,255,0.08); border:0.5px solid rgba(255,255,255,0.15); }
 
 .slide-num   { font-size:18px; margin-bottom:4px; }
 .slide-title { font-size:13px; font-weight:600; color:var(--primary-orange); margin-bottom:4px; }
