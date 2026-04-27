@@ -952,9 +952,8 @@ input {
 }
 .map-dot.green { background: #4CAF50; }
 .map-dot.grey  { background: #9E9E9E; }
-
 /* ==========================================
-   Avviso monitoraggio sessione
+   Avviso monitoraggio sessione attiva
    ========================================== */
 .session-monitor-notice {
   background: rgba(255, 152, 0, 0.1);

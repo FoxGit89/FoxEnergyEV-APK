@@ -10,7 +10,7 @@ header('Access-Control-Allow-Origin: *');
 header('X-Content-Type-Options: nosniff');
 header('X-Frame-Options: DENY');
 header('Referrer-Policy: no-referrer');
-header('Cache-Control: no-store, no-cache, must-revalidate'); 
+header('Cache-Control: no-store, no-cache, must-revalidate');
 
 $action = $_GET['action'] ?? '';
 
@@ -97,12 +97,11 @@ try {
                     end_reason='expired'
                 WHERE status='active'
                   AND (
-                      (slots_loaded IS NULL OR slots_loaded = '')
-                      AND started_at < DATE_SUB(NOW(), INTERVAL 10 MINUTE)
-                  )
-                  OR (
-                      status='active'
-                      AND started_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE)
+                      (
+                          (slots_loaded IS NULL OR slots_loaded = '')
+                          AND started_at < DATE_SUB(NOW(), INTERVAL 10 MINUTE)
+                      )
+                      OR started_at < DATE_SUB(NOW(), INTERVAL 5 MINUTE)
                   )
             ");
         } catch(Exception $e) {}
@@ -210,15 +209,13 @@ try {
             exit;
         }
 
-        // Sicurezza: verifica che il file_id appartenga a uno slot
-        // effettivamente autorizzato per questo utente
+        // Verifica che il file_id appartenga a uno slot autorizzato per questo utente
         try {
             $u_tg    = $user['telegram_id'];
             $u_name  = $user['username'] ?? '';
             $u_score = (int)($user['trust_score'] ?? 0);
             $u_prem  = (int)($user['is_premium'] ?? 0);
-
-            $check = db()->prepare("
+            $chk = db()->prepare("
                 SELECT COUNT(*) FROM rfid_slots
                 WHERE json_file_id = ? AND status = 'active'
                   AND (
@@ -228,11 +225,9 @@ try {
                       OR FIND_IN_SET(?, allowed_users) > 0
                   )
             ");
-            $check->execute([$file_id, $u_score, $u_prem, $u_tg, $u_name]);
-            if ((int)$check->fetchColumn() === 0) {
-                // Log tentativo non autorizzato
-                db()->prepare("INSERT INTO system_logs (level,context,user_id,message) VALUES ('WARNING','FoxSync',?,?)")
-                    ->execute([$user['id']??null, "Tentativo accesso file_id non autorizzato: {$file_id} da utente {$u_tg}"]);
+            $chk->execute([$file_id, $u_score, $u_prem, $u_tg, $u_name]);
+            if ((int)$chk->fetchColumn() === 0) {
+                try { db()->prepare("INSERT INTO system_logs (level,context,user_id,message) VALUES ('WARNING','FoxSync',?,?)")->execute([$user['id']??null, "Tentativo accesso file_id non autorizzato: {$file_id} da {$u_tg}"]); } catch(Exception $e) {}
                 echo json_encode(['error' => 'Accesso non autorizzato.']);
                 exit;
             }
@@ -486,14 +481,8 @@ try {
                                 } catch(Exception $e) {}
 
                                 // Notifica utente
-                                $tg_u  = "🛡️ <b>FoxSync Security — Irregolarità rilevata</b>\n";
-                                $tg_u .= "La tua sessione Chameleon risulta <b>non chiusa correttamente</b>.\n\n";
-                                $tg_u .= "📋 <b>Cosa succede ora:</b>\n";
-                                $tg_u .= "• I log di sessione (posizione GPS, durata, tessere usate) sono stati acquisiti\n";
-                                $tg_u .= "• Il team Fox Energy verificherà i dati registrati\n";
-                                $tg_u .= "• In caso di utilizzo non regolare, l'accesso potrà essere sospeso\n\n";
-                                $tg_u .= "✅ Se hai usato le tessere regolarmente, dichiara il consumo dal bot e contatta un amministratore.\n\n";
-                                $tg_u .= "<i>FoxSync Security registra ogni sessione per garantire un servizio equo a tutti gli utenti.</i>";
+                                $tg_u  = "⚠️ <b>FoxSync — Sessione interrotta</b>
+
 ";
                                 $tg_u .= "La tua sessione Chameleon non è stata chiusa correttamente.
 
@@ -651,22 +640,17 @@ try {
                             } catch(Exception $e) {}
 
                             // Notifica admin Telegram
-                            $tg_admin  = "🦊 <b>ANOMALIA FOXSYNC — Azione richiesta</b>
-";
-                            $tg_admin .= "━━━━━━━━━━━━━━━━━━━━━━
+                            $tg_admin  = "🦊 <b>ANOMALIA FOXSYNC</b>
 ";
                             $tg_admin .= "👤 {$uname} (ID:{$user_id})
 ";
                             $tg_admin .= "⏱ Durata: {$dur}s · Motivo: {$rsn}
 ";
                             $tg_admin .= "💾 Slot: " . ($sess['slots_loaded']??'—') . "
+
 ";
-                            $tg_admin .= "━━━━━━━━━━━━━━━━━━━━━━
+                            foreach ($alerts as $a) $tg_admin .= "• {$a}
 ";
-                            foreach ($alerts as $a) $tg_admin .= "⚠️ {$a}
-";
-                            $tg_admin .= "
-📋 L'utente è stato avvisato. Verifica i log nel portale.";
                             try {
                                 $admins = db()->query("SELECT chat_id FROM admin_users WHERE chat_id IS NOT NULL AND chat_id!=''")->fetchAll(PDO::FETCH_COLUMN);
                                 foreach ($admins as $cid)
@@ -674,19 +658,8 @@ try {
                             } catch(Exception $e) {}
 
                             // Notifica utente Telegram
-                            $tg_user  = "🛡️ <b>FoxSync Security — Avviso utilizzo</b>\n";
-                            $tg_user .= "\n";
-                            $tg_user .= "Il sistema ha rilevato un <b>utilizzo anomalo</b> del tuo Chameleon Ultra.\n";
-                            $tg_user .= "\n";
-                            $tg_user .= "📍 Sessione registrata con:\n";
-                            $tg_user .= "• Posizione GPS acquisita\n";
-                            $tg_user .= "• Durata e tessere caricate tracciate\n";
-                            $tg_user .= "• Log inviato agli amministratori\n";
-                            $tg_user .= "\n";
-                            $tg_user .= "⚠️ <b>Utilizzi ripetuti non regolari comportano la sospensione immediata dell'accesso a FoxSync.</b>\n";
-                            $tg_user .= "\n";
-                            $tg_user .= "Attendi un contatto dal team Fox Energy.\n";
-                            $tg_user .= "<i>Se ritieni si tratti di un errore, rispondi a questo messaggio.</i>";
+                            $tg_user  = "⚠️ <b>FoxSync Security Alert</b>
+
 ";
                             $tg_user .= "È stato rilevato un utilizzo anomalo del tuo Chameleon Ultra.
 
