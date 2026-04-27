@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>FoxSync by Fox Energy EV</title>
   <meta name="theme-color" content="#FF9800">
-  <link rel="manifest" href="manifest.json?v=71">
-  <link rel="stylesheet" href="style.css?v=71">
+  <link rel="manifest" href="manifest.json?v=72">
+  <link rel="stylesheet" href="style.css?v=72">
   <!-- Leaflet per mappa colonnine -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -237,14 +237,14 @@
     <div class="container" style="display:flex;flex-direction:column;align-items:center;height:calc(100vh - 60px);text-align:center;padding:20px 20px 16px;overflow-y:auto">
 
       <!-- Ring countdown -->
-      <div class="session-ring-wrap" style="width:150px;height:150px;flex-shrink:0;margin-bottom:16px">
-        <svg class="session-ring" viewBox="0 0 160 160" style="transform:rotate(-90deg)">
-          <circle class="session-ring-bg" cx="80" cy="80" r="68" stroke-width="8"/>
+      <div class="session-ring-wrap">
+        <svg class="session-ring" viewBox="0 0 160 160">
+          <circle class="session-ring-bg" cx="80" cy="80" r="68"/>
           <circle id="session-ring-fill" class="session-ring-fill" cx="80" cy="80" r="68"
-            stroke-dasharray="427.26" stroke-dashoffset="0" stroke-width="8" stroke-linecap="round"/>
+            stroke-dasharray="427.26" stroke-dashoffset="0"/>
         </svg>
         <div class="session-ring-inner">
-          <div id="session-countdown-num" class="session-countdown-num" style="font-size:48px;font-weight:300">60</div>
+          <div id="session-countdown-num" class="session-countdown-num">60</div>
           <div class="session-countdown-label">secondi</div>
         </div>
       </div>
@@ -340,6 +340,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=71"></script>
+  <script src="app.js?v=72"></script>
 </body>
 </html>
