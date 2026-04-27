@@ -1202,8 +1202,7 @@ const secureSession = {
 };
 
 // ============================================================
-// BLE ENGINE — UNICA CONNESSIONE PER TUTTA LA SESSIONE
-// Flusso: connect → leggi slot → scrivi → usa tessere → wipe → disconnect
+// BLE ENGINE — UNIVERSALE (Compatibile con V1, V2.0 e V3.0)
 // ============================================================
 window.bleEngine = {
   ultra: null,
@@ -1229,30 +1228,27 @@ window.bleEngine = {
     else document.getElementById('sync-back-btn').classList.add('hidden');
   },
 
-  // ── PASSO 1: Connetti → cancella subito → mostra selezione slot ──
+  // ── PASSO 1: Connetti e pulisci ──
   async connectAndRead(telegramId) {
     this.setConnectStatus('📶','CONNESSIONE IN CORSO','Seleziona il Chameleon Ultra nel popup Bluetooth...');
     try {
       const { ChameleonUltra, TagType, FreqType, DeviceMode } = window.ChameleonUltraJS;
-
-      // Connessione — pattern identico v10
+      
       if (this.ultra) { try{await this.ultra.disconnect();}catch(e){} this.ultra=null; }
-      // Timeout 30s per operazioni BLE intensive (default 5s è troppo poco per 8 slot 4K)
+      
       this.ultra = new ChameleonUltra();
       await this.ultra.use(new window.ChameleonUltraJS.WebbleAdapter());
       await this.ultra.connect();
 
-      // 1. Leggi snapshot slot PRIMA di cancellare (silenzioso, per audit DB)
       this.setConnectStatus('🔍','LETTURA IN CORSO','Lettura configurazione attuale...');
       const slotSnapshot = [];
       for (let i=0; i<8; i++) {
         let name = null, uid = null;
         try { name = await this.ultra.cmdSlotGetFreqName(i, FreqType.HF); } catch(e) {}
         if (name && name.trim()) {
-          // Attiva lo slot per leggere l'UID anti-collision
           try {
             await this.ultra.cmdSlotSetActive(i);
-            await new Promise(r=>setTimeout(r,30));
+            await new Promise(r=>setTimeout(r,50)); // Respiro universale
             const ac = await this.ultra.cmdHf14aGetAntiCollData();
             if (ac?.uid) {
               uid = Array.from(ac.uid).map(b=>b.toString(16).padStart(2,'0').toUpperCase()).join(':');
@@ -1261,62 +1257,59 @@ window.bleEngine = {
           slotSnapshot.push({ slot: i+1, name: name.trim(), uid: uid || null });
         }
       }
-      // Conserva snapshot in memoria — verrà salvato con session_id dopo start_session
       this._pendingSnapshot = slotSnapshot.length > 0 ? slotSnapshot : null;
 
-      // 2. Cancella immediatamente tutti gli slot per sicurezza
       this.setConnectStatus('🧹','PULIZIA IN CORSO','Cancellazione slot precedenti...');
       for (let i=0; i<8; i++) {
         await this.ultra.cmdSlotChangeTagType(i, TagType.MIFARE_1024);
         await this.ultra.cmdSlotResetTagType(i, TagType.MIFARE_1024);
         await this.ultra.cmdSlotSetEnable(i, FreqType.HF, false);
         await this.ultra.cmdSlotDeleteFreqName(i, FreqType.HF).catch(()=>{});
-        await new Promise(r=>setTimeout(r,50));
+        
+        // TIMING UNIVERSALE: 150ms salva il V1, impercettibile per V2/V3
+        await new Promise(r=>setTimeout(r,150));
       }
+      
       await this.ultra.cmdSlotSaveSettings();
-      await new Promise(r=>setTimeout(r,200));
-      await this.ultra.cmdChangeDeviceMode(DeviceMode.TAG);
+      await new Promise(r=>setTimeout(r,400)); // Tempo per la memoria flash
 
-      // Reset mapping locale
+      // CAMBIO MODALITA' UNIVERSALE SICURO
+      try { await this.ultra.cmdChangeDeviceMode(DeviceMode.TAG); } catch(e) {}
+
       app.mapping = { 1:null,2:null,3:null,4:null,5:null,6:null,7:null,8:null };
       app.renderSlots();
-
-      this.setConnectStatus('✅','PRONTO','Chameleon pulito. Seleziona le tessere da caricare.');
+      this.setConnectStatus('✅','PRONTO','Chameleon pronto. Seleziona le tessere.');
       document.getElementById('connect-back-btn').classList.add('hidden');
-      // Mostra la sezione selezione slot
       document.getElementById('connect-config-section').classList.remove('hidden');
 
     } catch(err) {
       console.error('[CONNECT ERROR]',err);
-      this.setConnectStatus('❌','ERRORE CONNESSIONE',`${err.message}\n\nAssicurati che il Bluetooth sia attivo e il Chameleon Ultra sia acceso.`,true);
+      this.setConnectStatus('❌','ERRORE CONNESSIONE',`${err.message}\n\nAssicurati che il Bluetooth sia attivo. Se il dispositivo non risponde, riavvialo.`,true);
       if (this.ultra){try{await this.ultra.disconnect();}catch(e){} this.ultra=null;}
     }
   },
 
-  // ── PASSO 2: Scrivi slot — BLE già connesso ──
+  // ── PASSO 2: Scrivi slot ──
   async startSync(mapping, telegramId) {
     this.updateUI(0,'Scrittura tessere in corso...','working');
     try {
       const { TagType, FreqType, DeviceMode } = window.ChameleonUltraJS;
-
-      // BLE deve essere già connesso dal passo 1
-      if (!this.ultra) throw new Error('Dispositivo non connesso. Torna indietro e connetti il Chameleon.');
+      if (!this.ultra) throw new Error('Dispositivo non connesso. Torna indietro e riconnetti.');
 
       const slotsToWrite=[];
       for (let i=1;i<=8;i++) if(mapping[i]) slotsToWrite.push({slotIdx:i-1,card:mapping[i]});
       if (slotsToWrite.length===0) throw new Error('Nessuno slot selezionato.');
 
-      // Reset globale tutti gli 8 slot
-      this.updateUI(5,'🧹 Reset globale degli 8 slot...','working');
+      this.updateUI(5,'🧹 Reset globale degli slot...','working');
       for (let i=0;i<8;i++) {
         await this.ultra.cmdSlotChangeTagType(i,TagType.MIFARE_1024);
         await this.ultra.cmdSlotResetTagType(i,TagType.MIFARE_1024);
         await this.ultra.cmdSlotSetEnable(i,FreqType.HF,false);
         await this.ultra.cmdSlotDeleteFreqName(i,FreqType.HF).catch(()=>{});
-        await new Promise(r=>setTimeout(r,50));
+        await new Promise(r=>setTimeout(r,150)); // TIMING UNIVERSALE
       }
       await this.ultra.cmdSlotSaveSettings();
-      await new Promise(r=>setTimeout(r,200));
+      await new Promise(r=>setTimeout(r,300));
 
       const total=slotsToWrite.length;
       const loadedLabels=[];
@@ -1325,37 +1318,35 @@ window.bleEngine = {
         const {slotIdx,card}=slotsToWrite[idx];
         const base=10+(idx/total)*80;
 
-        this.updateUI(base,`[${idx+1}/${total}] Download: ${card.slot_label}...`,'working');
+        this.updateUI(base,`[${idx+1}/${total}] Configurazione ${card.slot_label}...`,'working');
         const res=await app.apiCall({action:'get_json_content',user_id:telegramId,slot_id:card.id});
         const profile=detectCardProfile(res);
         if (profile.writeMode==='unsupported') throw new Error(`Tessera non supportata: ${profile.tagName}`);
-        console.log(`[SLOT ${slotIdx+1}] ${profile.tagName} | ${profile.numBlocks} blocchi | UID: ${profile.uid.toString('hex')}`);
 
-        this.updateUI(base+(80/total)*0.3,`[${idx+1}/${total}] Configurazione slot ${slotIdx+1}...`,'working');
         await this.ultra.cmdSlotSetActive(slotIdx);
         await this.ultra.cmdSlotChangeTagType(slotIdx,profile.tagType);
         await this.ultra.cmdSlotResetTagType(slotIdx,profile.tagType);
         await this.ultra.cmdSlotSetEnable(slotIdx,FreqType.HF,true);
-        await new Promise(r=>setTimeout(r,150));
+        await new Promise(r=>setTimeout(r,100)); // TIMING UNIVERSALE
         await this.ultra.cmdSlotSetFreqName(slotIdx,FreqType.HF,card.slot_label);
         await this.ultra.cmdHf14aSetAntiCollData({uid:profile.uid,atqa:profile.atqa,sak:profile.sak,ats:profile.ats});
 
-        this.updateUI(base+(80/total)*0.5,`[${idx+1}/${total}] Scrittura ${profile.numBlocks} blocchi...`,'working');
+        this.updateUI(base+(80/total)*0.5,`[${idx+1}/${total}] Scrittura blocchi...`,'working');
         for (let block=0;block<profile.numBlocks;block++) {
           const chunk=profile.body.slice(block*16,(block+1)*16);
-          // Retry automatico in caso di timeout BLE
           for (let attempt=0; attempt<3; attempt++) {
             try {
               await this.ultra.cmdMf1EmuWriteBlock(block,chunk);
               break;
             } catch(e) {
-              if (attempt===2) throw e; // fallisce dopo 3 tentativi
-              await new Promise(r=>setTimeout(r,600)); // pausa prima di retry
+              if (attempt===2) throw e;
+              await new Promise(r=>setTimeout(r,300));
             }
           }
-          // Pausa ogni 16 blocchi per dare respiro al BLE
-          if (block>0 && block%16===0) {
-            await new Promise(r=>setTimeout(r,150));
+          
+          // TIMING UNIVERSALE: Pausa ogni 8 blocchi per evitare saturazione buffer V1
+          if (block>0 && block%8===0) {
+            await new Promise(r=>setTimeout(r,150)); 
           }
           if (block%8===0||block===profile.numBlocks-1) {
             const wp=base+(80/total)*0.5+(80/total)*0.45*(block/profile.numBlocks);
@@ -1363,46 +1354,39 @@ window.bleEngine = {
           }
         }
         loadedLabels.push(card.slot_label);
-        this.updateUI(base+(80/total)*0.98,`Slot ${slotIdx+1} scritto ✓`,'working');
-        await new Promise(r=>setTimeout(r,300));
+        await new Promise(r=>setTimeout(r,200));
       }
 
-      this.updateUI(92,'💾 Salvataggio...','working');
+      this.updateUI(92,'💾 Salvataggio in corso...','working');
       await this.ultra.cmdSlotSaveSettings();
-      await new Promise(r=>setTimeout(r,500));
+      await new Promise(r=>setTimeout(r,400));
 
       this.updateUI(96,'🔄 Attivazione TAG...','working');
-      await this.ultra.cmdChangeDeviceMode(DeviceMode.READER);
-      await new Promise(r=>setTimeout(r,600));
-      await this.ultra.cmdChangeDeviceMode(DeviceMode.TAG);
+      
+      // CAMBIO MODALITA' UNIVERSALE SICURO
+      try { 
+        await this.ultra.cmdChangeDeviceMode(DeviceMode.READER);
+        await new Promise(r=>setTimeout(r,300));
+        await this.ultra.cmdChangeDeviceMode(DeviceMode.TAG);
+      } catch(e) {}
 
-      // BLE rimane connesso — avvia sessione sicura
       this.updateUI(100,'✅ Tessere caricate! Avvio sessione...','success');
       if(navigator.vibrate)navigator.vibrate([100,50,100]);
       await new Promise(r=>setTimeout(r,800));
-      // Registra apertura sessione nel DB e aggancia lo snapshot
+      
       const geo = app._pendingGeoLocation || {};
       app.apiCall({
-        action:  'start_session',
-        user_id: telegramId,
-        slots:   loadedLabels.join(','),
-        lat:     geo.lat || '',
-        lng:     geo.lng || '',
-        acc:     geo.acc || '',
+        action:  'start_session', user_id: telegramId, slots: loadedLabels.join(','),
+        lat: geo.lat || '', lng: geo.lng || '', acc: geo.acc || '',
       }).then(res => {
         const sessionId = res?.session_id;
-        // Salva snapshot con session_id se disponibile
         const snap = bleEngine._pendingSnapshot;
         if (snap && snap.length > 0) {
-          app.apiCall({
-            action:     'save_slot_snapshot',
-            user_id:    telegramId,
-            snapshot:   JSON.stringify(snap),
-            session_id: sessionId || '',
-          }).catch(()=>{});
+          app.apiCall({ action: 'save_slot_snapshot', user_id: telegramId, snapshot: JSON.stringify(snap), session_id: sessionId || '' }).catch(()=>{});
           bleEngine._pendingSnapshot = null;
         }
       }).catch(()=>{});
+      
       secureSession.start(loadedLabels);
 
     } catch(err) {
@@ -1412,18 +1396,14 @@ window.bleEngine = {
     }
   },
 
-  // ── PASSO 3: Cancella tutti gli slot — BLE ancora connesso ──
+  // ── PASSO 3: Cancella tutti gli slot e Disconnetti ──
   async wipeAllSlots(setWipe) {
     const { TagType, FreqType, DeviceMode } = window.ChameleonUltraJS;
-
-    // Riusa connessione esistente se disponibile
     if (!this.ultra) {
-      // BLE perso: dobbiamo riconnetterci
       setWipe('📶','RICONNESSIONE','Connessione persa. Tentativo di riconnessione...');
       const { ChameleonUltra } = window.ChameleonUltraJS;
       this.ultra = new ChameleonUltra();
       await this.ultra.use(new window.ChameleonUltraJS.WebbleAdapter());
-      // Nota: questo richiede un secondo popup — se fallisce, è gestito dal catch in secureSession
       await this.ultra.connect();
     }
 
@@ -1433,14 +1413,32 @@ window.bleEngine = {
       await this.ultra.cmdSlotResetTagType(i,TagType.MIFARE_1024);
       await this.ultra.cmdSlotSetEnable(i,FreqType.HF,false);
       await this.ultra.cmdSlotDeleteFreqName(i,FreqType.HF).catch(()=>{});
-      await new Promise(r=>setTimeout(r,100));
+      await new Promise(r=>setTimeout(r,150)); // TIMING UNIVERSALE
       setWipe('🗑️','CANCELLAZIONE IN CORSO',`Slot ${i+1}/8 cancellato...`);
     }
+    
     await this.ultra.cmdSlotSaveSettings();
-    await new Promise(r=>setTimeout(r,1500));
-    await this.ultra.cmdChangeDeviceMode(DeviceMode.TAG);
-    await this.ultra.disconnect();
-    this.ultra=null;
+    await new Promise(r=>setTimeout(r,600)); // Tempo lungo per salvataggio Flash
+
+    // DISCONNESSIONE UNIVERSALE SICURA (V1, V2, V3)
+    try { await this.ultra.cmdChangeDeviceMode(DeviceMode.TAG); } catch(e) {}
+    
+    // Dummy Read per svuotare il buffer BLE prima del disconnect
+    try { await this.ultra.cmdGetAppVersion(); } catch(e) {}
+    
+    await new Promise(r=>setTimeout(r,500)); // Respiro finale prima del taglio
+
+    try {
+        if (this.ultra.adapter && typeof this.ultra.adapter.disconnect === 'function') {
+            await this.ultra.adapter.disconnect();
+        } else {
+            await this.ultra.disconnect();
+        }
+    } catch(e) {
+        console.warn("Disconnessione forzata:", e);
+    } finally {
+        this.ultra = null;
+    }
   },
 };
 
