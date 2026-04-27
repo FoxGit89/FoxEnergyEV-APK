@@ -503,8 +503,28 @@ const app = {
         });
 
         document.getElementById('map-loading').style.display = 'none';
-        // Forza ridisegno mappa (necessario quando il div era hidden)
         setTimeout(() => this._map.invalidateSize(), 100);
+
+        // Pannello debug: mostra tag raw delle colonnine trovate
+        const debugPanel = document.getElementById('map-debug-panel');
+        if (debugPanel) {
+          const matched = pois.filter(p => {
+            const t = [p.operator,p.brand,p.network,p.name,p.allTags].filter(Boolean).join(' ').toLowerCase();
+            return userKeywords.some(({keywords}) => keywords.some(kw => t.includes(kw)));
+          }).length;
+
+          // Lista operatori unici trovati da OSM (operator + brand + name)
+          const rawOps = [...new Set(
+            pois.map(p => [p.operator, p.brand, p.network].filter(Boolean).join(' / ')).filter(Boolean)
+          )].slice(0,20);
+
+          const noTagCount = pois.filter(p => !p.operator && !p.brand && !p.network && !p.name).length;
+
+          debugPanel.innerHTML =
+            `<b>🔍 OSM:</b> ${pois.length} colonnine · <b style="color:#4CAF50">${matched} con tessera</b> · ${noTagCount} senza tag<br>` +
+            `<b>Operatori trovati:</b> ${rawOps.length ? rawOps.join(' | ') : '<i>nessun operator/brand tag in OSM</i>'}`;
+          debugPanel.style.display = 'block';
+        }
 
       } catch(e) {
         document.getElementById('map-loading-text').textContent = 'Errore caricamento colonnine';
