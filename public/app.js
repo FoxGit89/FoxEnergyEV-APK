@@ -1359,7 +1359,7 @@ window.bleEngine = {
 
       this.updateUI(92,'💾 Salvataggio in corso...','working');
       await this.ultra.cmdSlotSaveSettings();
-      await new Promise(r=>setTimeout(r,400));
+      await new Promise(r=>setTimeout(r,800));
 
       this.updateUI(96,'🔄 Attivazione TAG...','working');
       
@@ -1413,12 +1413,12 @@ window.bleEngine = {
       await this.ultra.cmdSlotResetTagType(i,TagType.MIFARE_1024);
       await this.ultra.cmdSlotSetEnable(i,FreqType.HF,false);
       await this.ultra.cmdSlotDeleteFreqName(i,FreqType.HF).catch(()=>{});
-      await new Promise(r=>setTimeout(r,150)); // TIMING UNIVERSALE
+      await new Promise(r=>setTimeout(r,800)); // TIMING UNIVERSALE
       setWipe('🗑️','CANCELLAZIONE IN CORSO',`Slot ${i+1}/8 cancellato...`);
     }
     
     await this.ultra.cmdSlotSaveSettings();
-    await new Promise(r=>setTimeout(r,600)); // Tempo lungo per salvataggio Flash
+    await new Promise(r=>setTimeout(r,1000)); // Tempo lungo per salvataggio Flash
 
     // DISCONNESSIONE UNIVERSALE SICURA (V1, V2, V3)
     try { await this.ultra.cmdChangeDeviceMode(DeviceMode.TAG); } catch(e) {}
@@ -1426,7 +1426,7 @@ window.bleEngine = {
     // Dummy Read per svuotare il buffer BLE prima del disconnect
     try { await this.ultra.cmdGetAppVersion(); } catch(e) {}
     
-    await new Promise(r=>setTimeout(r,500)); // Respiro finale prima del taglio
+    await new Promise(r=>setTimeout(r,1500)); // Respiro finale prima del taglio
 
     try {
         if (this.ultra.adapter && typeof this.ultra.adapter.disconnect === 'function') {
