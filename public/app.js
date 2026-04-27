@@ -353,6 +353,103 @@ const app = {
         if (this._stationMarkers) this._stationMarkers.forEach(m => m.remove());
         this._stationMarkers = [];
 
+        // Dizionario di normalizzazione: varianti utente → keywords OSM
+        // OSM usa operator=, brand=, network=, name= in modo inconsistente
+        // Includiamo tutte le varianti documentate + wikidata IDs comuni
+        const OP_NORM = {
+          // Enel X / JuicePass
+          'enelx':        ['enel x','enel','juicepass','e-distribuzione','endesa'],
+          'enel x':       ['enel x','enel','juicepass'],
+          'enel x / ewiva':['enel','ewiva'],
+          // Plenitude / Be Charge / ENI
+          'plenitude':    ['plenitude','be charge','becharge','be_charge','be power','bepower','be-charge','eni gas','eni plenitude','plenitude on the road'],
+          // Free To X / Autostrade
+          'f2x':        ['free to x','free2x','f2x','freetox','autostrade'],
+          'f2x':        ['free to x','free2x','f2x','freetox'],
+          'free2x':       ['free to x','free2x','f2x'],
+          'free to x':    ['free to x','free2x','f2x'],
+          'freetox':      ['free to x','free2x','f2x'],
+          // Atlante / Nhoa
+          'atlante':      ['atlante','nhoa'],
+          // Electra
+          'electra':      ['electra'],
+          'electriese':   ['electra'],
+          'alectriase':   ['electra'],
+          'electriase':   ['electra'],
+          'electra france':['electra'],
+          // Duferco
+          'duferco':      ['duferco','duferco energia'],
+          // A2A
+          'a2a':        ['a2a','a2a energia','a2a smart city'],
+          // Ionity
+          'ionity':       ['ionity'],
+          // Ewiva / Volkswagen
+          'ewiva':        ['ewiva','volkswagen','vw'],
+          // Acea
+          'acea':         ['acea'],
+          // Allego
+          'allego':       ['allego','nuon'],
+          // Ayvens / Arval
+          'ayvens':       ['ayvens','arval','leaseplan'],
+          // GES
+          'ges':        ['ges','gestione energie'],
+          // IP Planet
+          'iplanet':      ['ip planet','iplanet','ip charge','italiana petroli'],
+          'ip planet':    ['ip planet','iplanet'],
+          'ip':         ['ip planet','iplanet','ip charge'],
+          'ipplanet':     ['ip planet','iplanet'],
+          // Powy
+          'powy':         ['powy'],
+          // Electrip
+          'electrip':     ['electrip'],
+          // Neogy
+          'neogy':        ['neogy'],
+          // Ecotap
+          'ecotap':       ['ecotap'],
+          'eco tap':      ['ecotap'],
+          // Q8 / Electra
+          'q8 electra':   ['q8','electra','kuwait petroleum'],
+          // Volvo
+          'volvo':        ['volvo'],
+          // Energetix
+          'energetix':    ['energetix'],
+          // Edison
+          'edison':       ['edison'],
+          // Alperia
+          'alperia':      ['alperia'],
+          // Nucleo
+          'nucleo':       ['nucleo'],
+          // Evway
+          'evway':        ['evway'],
+          // Emobitaly
+          'emobitaly':    ['emobi','emobitaly'],
+          // Estra
+          'estra':        ['estra'],
+          // E.ON
+          'eon':        ['e.on','eon'],
+          // TotalEnergies
+          'total':        ['totalenergies','total energies','total'],
+          // Go Electric
+          'go electric station':['go electric'],
+          // ChargePoint
+          'charge poin +':['chargepoint','charge point'],
+          // Jet Strom
+          'jet strom':    ['jet strom','jetstrom'],
+        };
+
+        // Normalizza: ogni operatore utente → lista di keywords OSM da cercare
+        const userKeywords = []; // [{keywords:[...], cards:[...]}]
+        userOps.forEach(op => {
+          const norm = OP_NORM[op] || [op]; // fallback: usa il nome così com'è
+          const existing = userKeywords.find(u => u.keywords.join() === norm.join());
+          if (existing) {
+            (cardToOps[op]||[]).forEach(c => { if(!existing.cards.includes(c)) existing.cards.push(c); });
+          } else {
+            userKeywords.push({ keywords: norm, cards: [...(cardToOps[op]||[])] });
+          }
+        });
+
+
         pois.forEach(poi => {
           const pLat = poi.lat;
           const pLng = poi.lng;
@@ -366,102 +463,6 @@ const app = {
           const address = poi.name || poi.operator || '';
           const town    = '';
           const conns   = poi.socket ? poi.socket.replace('yes','').trim() : '';
-
-          // Dizionario di normalizzazione: varianti utente → keywords OSM
-          // OSM usa operator=, brand=, network=, name= in modo inconsistente
-          // Includiamo tutte le varianti documentate + wikidata IDs comuni
-          const OP_NORM = {
-            // Enel X / JuicePass
-            'enelx':        ['enel x','enel','juicepass','e-distribuzione','endesa'],
-            'enel x':       ['enel x','enel','juicepass'],
-            'enel x / ewiva':['enel','ewiva'],
-            // Plenitude / Be Charge / ENI
-            'plenitude':    ['plenitude','be charge','becharge','be_charge','be power','bepower','be-charge','eni gas','eni plenitude','plenitude on the road'],
-            // Free To X / Autostrade
-            'f2x':          ['free to x','free2x','f2x','freetox','autostrade'],
-            'f2x':          ['free to x','free2x','f2x','freetox'],
-            'free2x':       ['free to x','free2x','f2x'],
-            'free to x':    ['free to x','free2x','f2x'],
-            'freetox':      ['free to x','free2x','f2x'],
-            // Atlante / Nhoa
-            'atlante':      ['atlante','nhoa'],
-            // Electra
-            'electra':      ['electra'],
-            'electriese':   ['electra'],
-            'alectriase':   ['electra'],
-            'electriase':   ['electra'],
-            'electra france':['electra'],
-            // Duferco
-            'duferco':      ['duferco','duferco energia'],
-            // A2A
-            'a2a':          ['a2a','a2a energia','a2a smart city'],
-            // Ionity
-            'ionity':       ['ionity'],
-            // Ewiva / Volkswagen
-            'ewiva':        ['ewiva','volkswagen','vw'],
-            // Acea
-            'acea':         ['acea'],
-            // Allego
-            'allego':       ['allego','nuon'],
-            // Ayvens / Arval
-            'ayvens':       ['ayvens','arval','leaseplan'],
-            // GES
-            'ges':          ['ges','gestione energie'],
-            // IP Planet
-            'iplanet':      ['ip planet','iplanet','ip charge','italiana petroli'],
-            'ip planet':    ['ip planet','iplanet'],
-            'ip':           ['ip planet','iplanet','ip charge'],
-            'ipplanet':     ['ip planet','iplanet'],
-            // Powy
-            'powy':         ['powy'],
-            // Electrip
-            'electrip':     ['electrip'],
-            // Neogy
-            'neogy':        ['neogy'],
-            // Ecotap
-            'ecotap':       ['ecotap'],
-            'eco tap':      ['ecotap'],
-            // Q8 / Electra
-            'q8 electra':   ['q8','electra','kuwait petroleum'],
-            // Volvo
-            'volvo':        ['volvo'],
-            // Energetix
-            'energetix':    ['energetix'],
-            // Edison
-            'edison':       ['edison'],
-            // Alperia
-            'alperia':      ['alperia'],
-            // Nucleo
-            'nucleo':       ['nucleo'],
-            // Evway
-            'evway':        ['evway'],
-            // Emobitaly
-            'emobitaly':    ['emobi','emobitaly'],
-            // Estra
-            'estra':        ['estra'],
-            // E.ON
-            'eon':          ['e.on','eon'],
-            // TotalEnergies
-            'total':        ['totalenergies','total energies','total'],
-            // Go Electric
-            'go electric station':['go electric'],
-            // ChargePoint
-            'charge poin +':['chargepoint','charge point'],
-            // Jet Strom
-            'jet strom':    ['jet strom','jetstrom'],
-          };
-
-          // Normalizza: ogni operatore utente → lista di keywords OSM da cercare
-          const userKeywords = []; // [{keywords:[...], cards:[...]}]
-          userOps.forEach(op => {
-            const norm = OP_NORM[op] || [op]; // fallback: usa il nome così com'è
-            const existing = userKeywords.find(u => u.keywords.join() === norm.join());
-            if (existing) {
-              (cardToOps[op]||[]).forEach(c => { if(!existing.cards.includes(c)) existing.cards.push(c); });
-            } else {
-              userKeywords.push({ keywords: norm, cards: [...(cardToOps[op]||[])] });
-            }
-          });
 
           // Matching: cerca se una keyword è contenuta nel titolo OSM (case-insensitive)
           const matchedCards = [];

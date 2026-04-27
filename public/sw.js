@@ -30,8 +30,8 @@ self.addEventListener('activate', event => {
 });
 
 self.addEventListener('fetch', event => {
-  // Always hit network for API
-  if (event.request.url.includes('app_api.php')) {
+  // Non cachare: API PHP e richieste POST (es. Overpass)
+  if (event.request.url.includes('app_api.php') || event.request.method === 'POST') {
     return;
   }
 
