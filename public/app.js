@@ -313,12 +313,13 @@ const app = {
       try {
         // Raggio 5km attorno alla posizione
         const radius = 5000;
-        const query = `[out:json][timeout:15];
+        // Recupera tutti i tag rilevanti: operator, brand, network, name
+        const query = `[out:json][timeout:20];
           (
             node["amenity"="charging_station"](around:${radius},${lat},${lng});
             way["amenity"="charging_station"](around:${radius},${lat},${lng});
           );
-          out center 30;`;
+          out center tags 40;`;
         const resp = await fetch('https://overpass-api.de/api/interpreter', {
           method: 'POST',
           body: query,
@@ -328,14 +329,21 @@ const app = {
 
         // Normalizza in formato simile a OCM
         const pois = data.elements.map(el => ({
-          id: el.id,
-          lat: el.lat || el.center?.lat,
-          lng: el.lon || el.center?.lon,
-          name: el.tags?.name || el.tags?.['operator'] || 'Colonnina',
-          operator: el.tags?.operator || el.tags?.['brand'] || '',
-          network: el.tags?.network || '',
-          socket: el.tags?.['socket:type2'] || el.tags?.['socket:chademo'] || '',
-          maxpower: el.tags?.['maxpower'] || el.tags?.['capacity'] || '',
+          id:       el.id,
+          lat:      el.lat || el.center?.lat,
+          lng:      el.lon || el.center?.lon,
+          name:     el.tags?.name || el.tags?.operator || el.tags?.brand || 'Colonnina',
+          operator: el.tags?.operator || '',
+          brand:    el.tags?.brand || '',
+          network:  el.tags?.network || '',
+          operator_wikidata: el.tags?.['operator:wikidata'] || '',
+          socket:   [
+            el.tags?.['socket:type2']   ? 'Type2' : '',
+            el.tags?.['socket:ccs2']    ? 'CCS' : '',
+            el.tags?.['socket:chademo'] ? 'CHAdeMO' : '',
+            el.tags?.['socket:tesla_supercharger'] ? 'Tesla' : '',
+          ].filter(Boolean).join(', '),
+          capacity: el.tags?.capacity || '',
         })).filter(p => p.lat && p.lng);
 
         // Rimuovi marker colonnine precedenti
@@ -347,59 +355,96 @@ const app = {
           const pLng = poi.lng;
           if (!pLat || !pLng) return;
 
-          const opTitle = (poi.operator + ' ' + poi.network + ' ' + poi.name).toLowerCase();
-          const address = poi.name;
+          // Combina tutti i campi OSM rilevanti per il matching
+          const opTitle = [
+            poi.operator, poi.brand, poi.network, poi.name, poi.operator_wikidata
+          ].filter(Boolean).join(' ').toLowerCase();
+          const address = poi.name || poi.operator || '';
           const town    = '';
           const conns   = poi.socket ? poi.socket.replace('yes','').trim() : '';
 
           // Dizionario di normalizzazione: varianti utente → keywords OSM
+          // OSM usa operator=, brand=, network=, name= in modo inconsistente
+          // Includiamo tutte le varianti documentate + wikidata IDs comuni
           const OP_NORM = {
-            'enelx':['enel','juicepass','enel x'],
+            // Enel X / JuicePass
+            'enelx':        ['enel x','enel','juicepass','e-distribuzione','endesa'],
+            'enel x':       ['enel x','enel','juicepass'],
             'enel x / ewiva':['enel','ewiva'],
-            'enel x':['enel','juicepass'],
-            'plenitude':['plenitude','eni','be charge','becharge'],
-            'f2x':['free to x','f2x','free2x'],
-            'free2x':['free to x','f2x'],
-            'free to x':['free to x','f2x'],
-            'freetox':['free to x','f2x'],
-            'atlante':['atlante'],
-            'electra':['electra'],
-            'electriese':['electra'],
-            'alectriase':['electra'],
-            'electriase':['electra'],
+            // Plenitude / Be Charge / ENI
+            'plenitude':    ['plenitude','be charge','becharge','be power','bepower','eni gas','plenitude on the road'],
+            // Free To X / Autostrade
+            'f2x':          ['free to x','free2x','f2x','freetox','autostrade'],
+            'f2x':          ['free to x','free2x','f2x','freetox'],
+            'free2x':       ['free to x','free2x','f2x'],
+            'free to x':    ['free to x','free2x','f2x'],
+            'freetox':      ['free to x','free2x','f2x'],
+            // Atlante / Nhoa
+            'atlante':      ['atlante','nhoa'],
+            // Electra
+            'electra':      ['electra'],
+            'electriese':   ['electra'],
+            'alectriase':   ['electra'],
+            'electriase':   ['electra'],
             'electra france':['electra'],
-            'q8 electra':['q8','electra'],
-            'duferco':['duferco'],
-            'a2a':['a2a'],
-            'ionity':['ionity'],
-            'ewiva':['ewiva'],
-            'acea':['acea'],
-            'allego':['allego'],
-            'ayvens':['ayvens','arval'],
-            'ges':['ges'],
-            'iplanet':['ip planet','iplanet','ip charge'],
-            'ip planet':['ip planet','iplanet'],
-            'ip':['ip planet','iplanet'],
-            'ipplanet':['ip planet','iplanet'],
-            'powy':['powy'],
-            'electrip':['electrip'],
-            'neogy':['neogy'],
-            'ecotap':['ecotap'],
-            'eco tap':['ecotap'],
-            'volvo':['volvo'],
-            'energetix':['energetix'],
-            'edison':['edison'],
-            'alperia':['alperia'],
-            'nucleo':['nucleo'],
-            'evway':['evway'],
-            'emobitaly':['emobi'],
-            'estra':['estra'],
-            'eon':['e.on','eon'],
-            'total':['totalenergies','total'],
+            // Duferco
+            'duferco':      ['duferco','duferco energia'],
+            // A2A
+            'a2a':          ['a2a','a2a energia','a2a smart city'],
+            // Ionity
+            'ionity':       ['ionity'],
+            // Ewiva / Volkswagen
+            'ewiva':        ['ewiva','volkswagen','vw'],
+            // Acea
+            'acea':         ['acea'],
+            // Allego
+            'allego':       ['allego','nuon'],
+            // Ayvens / Arval
+            'ayvens':       ['ayvens','arval','leaseplan'],
+            // GES
+            'ges':          ['ges','gestione energie'],
+            // IP Planet
+            'iplanet':      ['ip planet','iplanet','ip charge','italiana petroli'],
+            'ip planet':    ['ip planet','iplanet'],
+            'ip':           ['ip planet','iplanet','ip charge'],
+            'ipplanet':     ['ip planet','iplanet'],
+            // Powy
+            'powy':         ['powy'],
+            // Electrip
+            'electrip':     ['electrip'],
+            // Neogy
+            'neogy':        ['neogy'],
+            // Ecotap
+            'ecotap':       ['ecotap'],
+            'eco tap':      ['ecotap'],
+            // Q8 / Electra
+            'q8 electra':   ['q8','electra','kuwait petroleum'],
+            // Volvo
+            'volvo':        ['volvo'],
+            // Energetix
+            'energetix':    ['energetix'],
+            // Edison
+            'edison':       ['edison'],
+            // Alperia
+            'alperia':      ['alperia'],
+            // Nucleo
+            'nucleo':       ['nucleo'],
+            // Evway
+            'evway':        ['evway'],
+            // Emobitaly
+            'emobitaly':    ['emobi','emobitaly'],
+            // Estra
+            'estra':        ['estra'],
+            // E.ON
+            'eon':          ['e.on','eon'],
+            // TotalEnergies
+            'total':        ['totalenergies','total energies','total'],
+            // Go Electric
             'go electric station':['go electric'],
-            'charge poin +':['chargepoint'],
-            'jet strom':['jet','strom'],
-            'a2a':['a2a'],
+            // ChargePoint
+            'charge poin +':['chargepoint','charge point'],
+            // Jet Strom
+            'jet strom':    ['jet strom','jetstrom'],
           };
 
           // Normalizza: ogni operatore utente → lista di keywords OSM da cercare
@@ -435,7 +480,9 @@ const app = {
           let popupHtml = `<div style="min-width:180px;font-family:sans-serif">`;
           popupHtml += `<b style="font-size:13px">${icon} ${this._esc(address)}</b>`;
           if (town) popupHtml += `<div style="color:#666;font-size:11px">${this._esc(town)}</div>`;
-          if (poi.operator) popupHtml += `<div style="margin-top:4px;font-size:12px">🏢 ${this._esc(poi.operator)}</div>`;
+          const opDisplay = poi.operator || poi.brand || '';
+          if (opDisplay) popupHtml += `<div style="margin-top:4px;font-size:12px">🏢 ${this._esc(opDisplay)}</div>`;
+          if (poi.capacity) popupHtml += `<div style="font-size:11px;color:#888">🔌 ${this._esc(poi.capacity)} punti</div>`;
           if (conns) popupHtml += `<div style="font-size:11px;color:#555">🔌 ${this._esc(conns)}</div>`;
           if (hasMatch) {
             popupHtml += `<div style="margin-top:8px;padding:6px 8px;background:#E8F5E9;border-radius:6px;font-size:12px">`;
