@@ -1192,7 +1192,7 @@ window.bleEngine = {
         const base=10+(idx/total)*80;
 
         this.updateUI(base,`[${idx+1}/${total}] Download: ${card.slot_label}...`,'working');
-        const res=await app.apiCall({action:'get_json_content',user_id:telegramId,file_id:card.json_file_id});
+        const res=await app.apiCall({action:'get_json_content',user_id:telegramId,slot_id:card.id});
         const profile=detectCardProfile(res);
         if (profile.writeMode==='unsupported') throw new Error(`Tessera non supportata: ${profile.tagName}`);
         console.log(`[SLOT ${slotIdx+1}] ${profile.tagName} | ${profile.numBlocks} blocchi | UID: ${profile.uid.toString('hex')}`);

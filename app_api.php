@@ -152,7 +152,7 @@ try {
         $u_score = (int)($user['trust_score'] ?? 100);
         $u_prem  = (int)($user['is_premium'] ?? 0);
 
-        $sql = "SELECT id, slot_label, json_file_id, rfid_uid, promo_from, promo_to, status
+        $sql = "SELECT id, slot_label, rfid_uid, promo_from, promo_to, status
                 FROM rfid_slots WHERE status = 'active'
                 AND (
                     (min_trust_score <= 0 AND (allowed_users IS NULL OR allowed_users = ''))
@@ -202,36 +202,50 @@ try {
     // 4. DOWNLOAD CONTENUTO TESSERA DA TELEGRAM
     // =========================================================
     if ($action === 'get_json_content') {
-        $file_id = $_GET['file_id'] ?? '';
+        // Accetta slot_id (non file_id) — il file_id non viene mai esposto al client
+        $slot_id = (int)($_GET['slot_id'] ?? 0);
 
-        if (empty($file_id)) {
-            echo json_encode(['error' => 'File ID mancante.']);
+        if (empty($slot_id)) {
+            echo json_encode(['error' => 'Slot ID mancante.']);
             exit;
         }
 
-        // Verifica che il file_id appartenga a uno slot autorizzato per questo utente
+        // Recupera file_id dal DB verificando che lo slot sia autorizzato per questo utente
+        $file_id = null;
         try {
             $u_tg    = $user['telegram_id'];
             $u_name  = $user['username'] ?? '';
             $u_score = (int)($user['trust_score'] ?? 0);
             $u_prem  = (int)($user['is_premium'] ?? 0);
             $chk = db()->prepare("
-                SELECT COUNT(*) FROM rfid_slots
-                WHERE json_file_id = ? AND status = 'active'
+                SELECT json_file_id FROM rfid_slots
+                WHERE id = ? AND status = 'active'
                   AND (
                       (min_trust_score <= 0 AND (allowed_users IS NULL OR allowed_users = ''))
                       OR (min_trust_score > 0 AND ? >= min_trust_score AND ? = 1)
                       OR FIND_IN_SET(?, allowed_users) > 0
                       OR FIND_IN_SET(?, allowed_users) > 0
                   )
+                LIMIT 1
             ");
-            $chk->execute([$file_id, $u_score, $u_prem, $u_tg, $u_name]);
-            if ((int)$chk->fetchColumn() === 0) {
-                try { db()->prepare("INSERT INTO system_logs (level,context,user_id,message) VALUES ('WARNING','FoxSync',?,?)")->execute([$user['id']??null, "Tentativo accesso file_id non autorizzato: {$file_id} da {$u_tg}"]); } catch(Exception $e) {}
+            $chk->execute([$slot_id, $u_score, $u_prem, $u_tg, $u_name]);
+            $row = $chk->fetch(PDO::FETCH_ASSOC);
+            if ($row) {
+                $file_id = $row['json_file_id'];
+            } else {
+                try { db()->prepare("INSERT INTO system_logs (level,context,user_id,message) VALUES ('WARNING','FoxSync',?,?)")->execute([$user['id']??null, "Tentativo accesso slot_id non autorizzato: {$slot_id} da {$u_tg}"]); } catch(Exception $e) {}
                 echo json_encode(['error' => 'Accesso non autorizzato.']);
                 exit;
             }
-        } catch(Exception $e) {}
+        } catch(Exception $e) {
+            echo json_encode(['error' => 'Errore verifica slot.']);
+            exit;
+        }
+
+        if (empty($file_id)) {
+            echo json_encode(['error' => 'File non configurato per questo slot.']);
+            exit;
+        }
 
         $token = getenv('BOT_TOKEN');
         if (empty($token)) {
