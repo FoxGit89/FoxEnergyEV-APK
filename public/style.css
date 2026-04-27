@@ -968,3 +968,127 @@ input {
   text-align: left;
 }
 .session-monitor-notice b { color: #FF9800; }
+
+/* ==========================================
+   Session screen redesign
+   ========================================== */
+.session-ring-wrap { position:relative; flex-shrink:0; }
+.session-ring { display:block; }
+.session-ring-bg { fill:none; stroke:rgba(255,255,255,0.06); }
+.session-ring-fill { fill:none; stroke:#FF9800; transition:stroke-dashoffset 0.5s linear; }
+.session-ring-fill.urgent { stroke:#f44336; }
+.session-ring-inner {
+  position:absolute; inset:0;
+  display:flex; flex-direction:column;
+  align-items:center; justify-content:center;
+}
+.session-countdown-num { font-size:48px; font-weight:300; color:white; line-height:1; }
+.session-countdown-label { font-size:11px; color:rgba(255,255,255,0.4); margin-top:2px; }
+
+/* Tessere con gestori nella sessione */
+.session-slot-card {
+  width:100%; text-align:left;
+  background:rgba(76,175,80,0.07);
+  border:0.5px solid rgba(76,175,80,0.2);
+  border-radius:11px; padding:10px 13px;
+  margin-bottom:8px;
+}
+.session-slot-name {
+  color:rgba(255,255,255,0.85);
+  font-size:12px; font-weight:600;
+  margin-bottom:7px;
+  display:flex; align-items:center; gap:6px;
+}
+.session-slot-ops { display:flex; flex-wrap:wrap; gap:4px; }
+.session-op-pill {
+  font-size:10px; padding:2px 8px;
+  border-radius:20px; font-weight:500;
+}
+
+/* Pulsante cancella sessione */
+.btn-session-cancel {
+  width:100%;
+  background:rgba(220,53,69,0.12);
+  border:0.5px solid rgba(220,53,69,0.35);
+  border-radius:14px; color:#ff6b7a;
+  font-size:14px; font-weight:500;
+  padding:15px; cursor:pointer;
+  transition:background 0.2s;
+}
+.btn-session-cancel:active { background:rgba(220,53,69,0.22); }
+
+/* ==========================================
+   Gestori compatibili nella dashboard
+   ========================================== */
+.dash-gestori-section {
+  padding:0 15px 4px; flex-shrink:0;
+}
+.dash-gestori-header {
+  display:flex; justify-content:space-between;
+  align-items:center; margin-bottom:10px;
+}
+.dash-gestori-title {
+  font-size:12px; font-weight:600;
+  color:rgba(255,255,255,0.85);
+}
+.dash-gestori-badge {
+  font-size:10px; color:#FF9800;
+  background:rgba(255,152,0,0.12);
+  border:0.5px solid rgba(255,152,0,0.25);
+  padding:2px 9px; border-radius:20px;
+  white-space:nowrap;
+}
+.dash-gestori-track {
+  display:flex; gap:10px;
+  overflow-x:auto; padding-bottom:6px;
+  scrollbar-width:none;
+}
+.dash-gestori-track::-webkit-scrollbar { display:none; }
+.dash-gestori-tile {
+  display:flex; flex-direction:column;
+  align-items:center; gap:5px;
+  flex-shrink:0; width:62px;
+}
+.dash-gestori-avatar {
+  width:50px; height:50px; border-radius:14px;
+  display:flex; align-items:center; justify-content:center;
+  font-size:16px; font-weight:700; color:#fff;
+  letter-spacing:-0.5px;
+}
+.dash-gestori-avatar.unused {
+  background:rgba(255,255,255,0.06) !important;
+  border:0.5px solid rgba(255,255,255,0.12);
+  color:rgba(255,255,255,0.35);
+}
+.dash-gestori-name {
+  font-size:9px; color:rgba(255,255,255,0.65);
+  text-align:center; line-height:1.3;
+  font-weight:500; max-width:62px;
+  overflow:hidden; text-overflow:ellipsis;
+  white-space:nowrap;
+}
+.dash-gestori-name.unused { color:rgba(255,255,255,0.3); }
+.dash-gestori-uses {
+  font-size:8px; padding:1px 6px;
+  border-radius:4px; font-weight:600;
+}
+.dash-gestori-uses.used {
+  color:#4CAF50;
+  background:rgba(76,175,80,0.15);
+}
+.dash-gestori-uses.unused {
+  color:rgba(255,255,255,0.25);
+  background:rgba(255,255,255,0.05);
+}
+.dash-gestori-legend {
+  display:flex; gap:14px; margin-top:8px;
+}
+.dash-gestori-legend-item {
+  display:flex; align-items:center; gap:5px;
+  font-size:9px; color:rgba(255,255,255,0.35);
+}
+.dash-gestori-dot {
+  width:9px; height:9px; border-radius:3px;
+}
+.dash-gestori-dot.used { background:linear-gradient(135deg,#1565C0,#1E88E5); }
+.dash-gestori-dot.new  { background:rgba(255,255,255,0.08); border:0.5px solid rgba(255,255,255,0.15); }

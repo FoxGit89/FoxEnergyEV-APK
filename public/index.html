@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>FoxSync by Fox Energy EV</title>
   <meta name="theme-color" content="#FF9800">
-  <link rel="manifest" href="manifest.json?v=68">
-  <link rel="stylesheet" href="style.css?v=68">
+  <link rel="manifest" href="manifest.json?v=70">
+  <link rel="stylesheet" href="style.css?v=70">
   <!-- Leaflet per mappa colonnine -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -90,6 +90,19 @@
       </a>
 
       <!-- Carosello istruzioni (occupa lo spazio rimanente) -->
+    <!-- Sezione gestori compatibili -->
+    <div id="dash-gestori-section" class="dash-gestori-section hidden">
+      <div class="dash-gestori-header">
+        <span class="dash-gestori-title">⚡ Reti compatibili</span>
+        <span id="dash-gestori-count" class="dash-gestori-badge"></span>
+      </div>
+      <div id="dash-gestori-track" class="dash-gestori-track"></div>
+      <div class="dash-gestori-legend">
+        <div class="dash-gestori-legend-item"><span class="dash-gestori-dot used"></span>già usata</div>
+        <div class="dash-gestori-legend-item"><span class="dash-gestori-dot new"></span>disponibile</div>
+      </div>
+    </div>
+
       <div class="how-to-section">
         <div class="how-to-carousel-wrap">
           <div class="how-to-carousel" id="how-to-carousel">
@@ -142,10 +155,7 @@
             <span class="tab-label">Messaggi</span>
             <span id="broadcasts-badge" class="tab-badge hidden">0</span>
           </button>
-          <button class="tab-btn" onclick="app.showMap()">
-            <span class="tab-icon">🗺️</span>
-            <span class="tab-label">Mappa</span>
-          </button>
+
         </div>
       </div>
 
@@ -220,44 +230,51 @@
 
   <!-- Screen 6: Sessione attiva (countdown 60s) -->
   <div id="session-screen" class="screen hidden">
-    <div class="app-header"><span>⚡ Sessione Attiva</span></div>
-    <div class="container" style="display:flex;flex-direction:column;align-items:center;justify-content:center;height:calc(100vh - 60px);text-align:center;padding:30px">
+    <div class="app-header" style="background:#1a1a1a;border-bottom:0.5px solid rgba(255,255,255,0.08)">
+      <span style="color:#4CAF50;font-weight:600">⚡ Sessione Attiva</span>
+      <span style="color:rgba(255,255,255,0.25);font-size:10px;letter-spacing:1px">FOXSYNC SECURITY</span>
+    </div>
+    <div class="container" style="display:flex;flex-direction:column;align-items:center;height:calc(100vh - 60px);text-align:center;padding:20px 20px 16px;overflow-y:auto">
 
-      <div class="session-ring-wrap">
-        <svg class="session-ring" viewBox="0 0 120 120">
-          <circle class="session-ring-bg" cx="60" cy="60" r="52"/>
-          <circle id="session-ring-fill" class="session-ring-fill" cx="60" cy="60" r="52" stroke-dasharray="326.73" stroke-dashoffset="0"/>
+      <!-- Ring countdown -->
+      <div class="session-ring-wrap" style="width:150px;height:150px;flex-shrink:0;margin-bottom:16px">
+        <svg class="session-ring" viewBox="0 0 160 160" style="transform:rotate(-90deg)">
+          <circle class="session-ring-bg" cx="80" cy="80" r="68" stroke-width="8"/>
+          <circle id="session-ring-fill" class="session-ring-fill" cx="80" cy="80" r="68"
+            stroke-dasharray="427.26" stroke-dashoffset="0" stroke-width="8" stroke-linecap="round"/>
         </svg>
         <div class="session-ring-inner">
-          <div id="session-countdown-num" class="session-countdown-num">60</div>
+          <div id="session-countdown-num" class="session-countdown-num" style="font-size:48px;font-weight:300">60</div>
           <div class="session-countdown-label">secondi</div>
         </div>
       </div>
 
-      <div style="font-size:16px;font-weight:700;color:#4CAF50;margin-bottom:8px">✅ Tessere caricate</div>
-      <div id="session-slots-summary" style="font-size:13px;color:var(--text-muted);margin-bottom:20px;line-height:1.6"></div>
-      <div style="font-size:15px;color:rgba(255,255,255,0.7);line-height:1.7;max-width:320px;margin-bottom:10px">
-        Avvicinati alla colonnina e usa il Chameleon Ultra.<br>
-        Gli slot verranno cancellati automaticamente alla scadenza.
-      </div>
-      <div class="session-monitor-notice">
-        🛡️ <b>Sessione monitorata da FoxSync Security</b><br>
-        <span>Posizione, durata e modalità di chiusura vengono registrate.
-        Chiudi sempre la sessione con il pulsante qui sotto.</span>
-      </div>
+      <!-- Tessere caricate con gestori -->
+      <div id="session-slots-summary" style="width:100%;margin-bottom:14px"></div>
+
+      <!-- Warning bar ultimi 10s -->
       <div id="session-warning-bar" class="session-warning-bar hidden">
         ⚠️ Cancellazione in corso tra <span id="session-warning-secs">10</span>s
       </div>
-      <div style="width:100%;margin-top:30px">
-        <button id="session-cancel-btn" class="btn-danger" onclick="secureSession.cancel('manual')">
-          🗑️ CANCELLA ORA E CHIUDI
-        </button>
-        <p style="color:var(--text-muted);font-size:12px;margin-top:14px;line-height:1.6">
-          <b style="color:rgba(255,165,0,0.9)">⚠️ Non chiudere l'app durante la sessione.</b><br>
-          La mancata cancellazione viene segnalata agli amministratori<br>
-          e può comportare la sospensione dell'accesso.
-        </p>
+
+      <!-- Badge monitoraggio compatto -->
+      <div style="width:100%;background:rgba(255,255,255,0.04);border-radius:11px;padding:10px 13px;margin-bottom:14px;display:flex;gap:10px;align-items:flex-start;text-align:left">
+        <span style="font-size:14px;flex-shrink:0">🛡️</span>
+        <div>
+          <div style="color:rgba(255,255,255,0.6);font-size:11px;font-weight:600;margin-bottom:2px">Sessione monitorata</div>
+          <div style="color:rgba(255,255,255,0.3);font-size:10px;line-height:1.5">Posizione e durata registrate. Chiudi sempre con il pulsante qui sotto.</div>
+        </div>
       </div>
+
+      <!-- Pulsante cancella -->
+      <button id="session-cancel-btn" class="btn-session-cancel" onclick="secureSession.cancel('manual')">
+        🗑️ Cancella ora e chiudi
+      </button>
+
+      <div style="margin-top:10px;color:rgba(255,255,255,0.2);font-size:10px;line-height:1.6;text-align:center">
+        Non chiudere l'app durante la sessione · La mancata cancellazione viene segnalata agli amministratori
+      </div>
+
     </div>
   </div>
 
@@ -298,44 +315,6 @@
     <div class="scroll-container"><div id="broadcasts-list"></div></div>
   </div>
 
-  <!-- Screen: Mappa Colonnine -->
-  <div id="map-screen" class="screen hidden">
-    <div class="app-header">
-      <button class="header-back" onclick="app.showScreen('dashboard-screen')">◀</button>
-      🗺️ Colonnine Vicine
-    </div>
-    <div id="map-container" style="position:relative;height:calc(100vh - 60px)">
-      <button onclick="app.showMap()" style="
-        position:absolute;top:10px;right:10px;z-index:1000;
-        background:#FF9800;color:white;border:none;border-radius:50px;
-        padding:9px 16px;font-size:13px;font-weight:700;
-        box-shadow:0 2px 8px rgba(0,0,0,0.3);cursor:pointer">
-        🔄 Aggiorna
-      </button>
-      <!-- Leaflet map fills this div -->
-      <div id="leaflet-map" style="width:100%;height:100%"></div>
-      <!-- Overlay caricamento -->
-      <div id="map-loading" style="position:absolute;top:0;left:0;right:0;bottom:0;background:rgba(0,0,0,0.7);display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:1000">
-        <div class="spinner"></div>
-        <div id="map-loading-text" style="color:white;margin-top:16px;font-size:14px">Rilevamento posizione...</div>
-      </div>
-      
-      <!-- Debug panel OSM -->
-      <!-- <div id="map-debug-panel" style="
-        display:none;position:absolute;bottom:80px;left:10px;right:10px;
-        background:rgba(0,0,0,0.82);color:white;border-radius:10px;
-        padding:10px 12px;font-size:11px;z-index:1000;line-height:1.6;
-        max-height:140px;overflow-y:auto">
-      </div> -->
-
-      <!-- Legenda -->
-      <div class="map-legend">
-        <div class="map-legend-item"><span class="map-dot green"></span>Tessera compatibile</div>
-        <div class="map-legend-item"><span class="map-dot grey"></span>Operatore non verificato</div>
-      </div>
-    </div>
-  </div>
-
   <!-- Slot Picker -->
   <div id="slot-picker" class="modal-overlay hidden">
     <div class="bottom-sheet">
@@ -361,6 +340,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=68"></script>
+  <script src="app.js?v=70"></script>
 </body>
 </html>

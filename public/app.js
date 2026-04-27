@@ -154,6 +154,7 @@ const app = {
       this.renderSlots();
       this.showScreen('dashboard-screen');
       this._initCarousel();
+      this._renderGestori();
     } catch(e) { console.error(e); alert(`Errore:\n${e.message||'Connessione fallita.'}`); this.logout(); }
   },
 
@@ -260,8 +261,98 @@ const app = {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   },
 
-  // ── MAPPA COLONNINE ──
-  async showMap() {
+
+  _opColor(name) {
+    const PALS=[
+      {bg:'rgba(30,136,229,0.22)',fg:'#90CAF9',border:'rgba(100,181,246,0.35)'},
+      {bg:'rgba(0,137,123,0.22)',fg:'#80CBC4',border:'rgba(77,182,172,0.35)'},
+      {bg:'rgba(142,36,170,0.22)',fg:'#CE93D8',border:'rgba(206,147,216,0.35)'},
+      {bg:'rgba(244,81,30,0.22)',fg:'#FFAB91',border:'rgba(255,138,101,0.35)'},
+      {bg:'rgba(2,119,189,0.22)',fg:'#81D4FA',border:'rgba(129,212,250,0.35)'},
+      {bg:'rgba(27,94,32,0.22)',fg:'#A5D6A7',border:'rgba(129,199,132,0.35)'},
+      {bg:'rgba(183,28,28,0.22)',fg:'#EF9A9A',border:'rgba(239,154,154,0.35)'},
+      {bg:'rgba(230,81,0,0.22)',fg:'#FFCC80',border:'rgba(255,204,128,0.35)'},
+      {bg:'rgba(106,27,154,0.22)',fg:'#B39DDB',border:'rgba(179,157,219,0.35)'},
+      {bg:'rgba(0,96,100,0.22)',fg:'#80DEEA',border:'rgba(128,222,234,0.35)'},
+    ];
+    const GRADS=[
+      'linear-gradient(135deg,#1565C0,#1E88E5)',
+      'linear-gradient(135deg,#00695C,#00897B)',
+      'linear-gradient(135deg,#6A1B9A,#8E24AA)',
+      'linear-gradient(135deg,#E65100,#F4511E)',
+      'linear-gradient(135deg,#B71C1C,#E53935)',
+      'linear-gradient(135deg,#0277BD,#039BE5)',
+      'linear-gradient(135deg,#1B5E20,#388E3C)',
+      'linear-gradient(135deg,#880E4F,#C2185B)',
+      'linear-gradient(135deg,#006064,#00838F)',
+      'linear-gradient(135deg,#4A148C,#7B1FA2)',
+    ];
+    let h=0; for(let i=0;i<name.length;i++) h=(Math.imul(31,h)+name.charCodeAt(i))|0;
+    const i=Math.abs(h)%PALS.length;
+    return {pill:PALS[i],grad:GRADS[i]};
+  },
+
+  _opInitials(name) {
+    const MAP={'enel x':'EX','enelx':'EX','enel x way':'EW','plenitude':'PL',
+      'be charge':'BC','becharge':'BC','atlante':'AT','free to x':'F2','f2x':'F2',
+      'free2x':'F2','ionity':'IO','a2a':'A2','ewiva':'EW','tesla':'TS',
+      'fastned':'FN','repower':'RP','electra':'EC','electrip':'EP',
+      'duferco':'DF','allego':'AL','acea':'AC','neogy':'NG','powy':'PW'};
+    const key=name.toLowerCase().trim();
+    if(MAP[key]) return MAP[key];
+    const parts=key.replace(/[^a-z0-9 ]/g,'').trim().split(' ').filter(Boolean);
+    if(parts.length>=2) return (parts[0][0]+(parts[1][0]||'')).toUpperCase();
+    return parts[0].slice(0,2).toUpperCase();
+  },
+
+  // ── GESTORI COMPATIBILI ──
+  _renderGestori() {
+    const section = document.getElementById('dash-gestori-section');
+    const track   = document.getElementById('dash-gestori-track');
+    const badge   = document.getElementById('dash-gestori-count');
+    if (!section || !track || !this.cards || !this.cards.length) return;
+
+    // Merge di tutti gli operatori da tutte le tessere, deduplicati
+    const opsMap = {}; // operator_name → {usage_count, cards:[]}
+    (this.cards||[]).forEach(card => {
+      (card.roaming_detail||[]).forEach(r => {
+        const key = r.operator_name;
+        if (!opsMap[key]) opsMap[key] = { usage_count:0, cards:[] };
+        opsMap[key].usage_count += parseInt(r.usage_count)||0;
+        if (!opsMap[key].cards.includes(card.slot_label))
+          opsMap[key].cards.push(card.slot_label);
+      });
+    });
+
+    // Ordina: usati prima (per utilizzi desc), poi nuovi
+    const ops = Object.entries(opsMap)
+      .map(([name,d]) => ({name, ...d}))
+      .sort((a,b) => b.usage_count - a.usage_count);
+
+    if (!ops.length) return;
+
+    badge.textContent = ops.length + (ops.length===1?' rete':' reti');
+    track.innerHTML = ops.map(op => {
+      const col   = this._opColor(op.name);
+      const ini   = this._opInitials(op.name);
+      const used  = op.usage_count > 0;
+      const avatarStyle = used
+        ? `background:${col.grad}`
+        : '';
+      return `<div class="dash-gestori-tile">
+        <div class="dash-gestori-avatar${used?'':' unused'}" style="${avatarStyle}">${this._esc(ini)}</div>
+        <div class="dash-gestori-name${used?'':' unused'}" title="${this._esc(op.name)}">${this._esc(op.name)}</div>
+        <div class="dash-gestori-uses${used?' used':' unused'}">${used ? op.usage_count+'×' : '0×'}</div>
+      </div>`;
+    }).join('');
+
+    section.classList.remove('hidden');
+  },
+
+  // ── MAPPA COLONNINE (rimossa — sostituita da carosello gestori) ──
+  showMap() { /* deprecata */ },
+
+  async _showMapOld() {
     app.showScreen('map-screen');
     document.getElementById('map-loading').style.display = 'flex';
     document.getElementById('map-loading-text').textContent = 'Rilevamento posizione...';
@@ -917,7 +1008,18 @@ const secureSession = {
     this._wiping     = false;
     // Aggiorna UI sessione
     const s=document.getElementById('session-slots-summary');
-    if(s) s.textContent=slotLabels.length===1?'Slot: '+slotLabels[0]:'Slot: '+slotLabels.join(', ');
+    if(s){
+      s.innerHTML=slotLabels.map(label=>{
+        const card=(app.cards||[]).find(c=>c.slot_label===label)||
+          Object.values(app.mapping||{}).find(c=>c&&c.slot_label===label);
+        const ops=card?.roaming_detail||[];
+        const opsHtml=ops.length?ops.slice(0,5).map(r=>{
+          const col=app._opColor(r.operator_name);
+          return `<span class="session-op-pill" style="background:${col.pill.bg};color:${col.pill.fg};border:0.5px solid ${col.pill.border}">${app._esc(r.operator_name)}</span>`;
+        }).join('')+(ops.length>5?`<span class="session-op-pill" style="background:rgba(255,255,255,0.06);color:rgba(255,255,255,0.4)">+${ops.length-5}</span>`:''):'';
+        return `<div class="session-slot-card"><div class="session-slot-name">✅ ${app._esc(label)}</div>${opsHtml?`<div class="session-slot-ops">${opsHtml}</div>`:''}</div>`;
+      }).join('');
+    }
     document.getElementById('session-warning-bar').classList.add('hidden');
     document.getElementById('session-cancel-btn').disabled=false;
     this._updateRing(SESSION_TIMEOUT_SEC);
@@ -1024,7 +1126,7 @@ const secureSession = {
     if(!n)return;
     const urgent=rem<=10;
     n.textContent=rem; n.className='session-countdown-num'+(urgent?' urgent':'');
-    if(ring){ring.style.strokeDashoffset=326.73*(1-rem/SESSION_TIMEOUT_SEC);ring.className='session-ring-fill'+(urgent?' urgent':'');}
+    if(ring){ring.style.strokeDashoffset=427.26*(1-rem/SESSION_TIMEOUT_SEC);ring.className='session-ring-fill'+(urgent?' urgent':'');}
     if(bar&&secs){if(urgent&&rem>0){bar.classList.remove('hidden');secs.textContent=rem;}else bar.classList.add('hidden');}
     // Vibrazione progressiva negli ultimi 10 secondi
     if(navigator.vibrate && rem>0) {
