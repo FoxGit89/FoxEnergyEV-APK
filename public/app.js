@@ -313,13 +313,14 @@ const app = {
       try {
         // Raggio 5km attorno alla posizione
         const radius = 5000;
-        // Recupera tutti i tag rilevanti: operator, brand, network, name
+        // Query Overpass: sintassi corretta per nodi e way con tutti i tag
+        // 'out body' = tutti i tag, 'center' = coordinate centroide per way, limit dopo
         const query = `[out:json][timeout:20];
           (
             node["amenity"="charging_station"](around:${radius},${lat},${lng});
             way["amenity"="charging_station"](around:${radius},${lat},${lng});
           );
-          out center tags 40;`;
+          out body center 50;`;
         const resp = await fetch('https://overpass-api.de/api/interpreter', {
           method: 'POST',
           body: query,
@@ -333,10 +334,12 @@ const app = {
           lat:      el.lat || el.center?.lat,
           lng:      el.lon || el.center?.lon,
           name:     el.tags?.name || el.tags?.operator || el.tags?.brand || 'Colonnina',
-          operator: el.tags?.operator || '',
+          operator: el.tags?.operator || el.tags?.['operator:it'] || '',
           brand:    el.tags?.brand || '',
-          network:  el.tags?.network || '',
+          network:  el.tags?.network || el.tags?.['network:it'] || '',
           operator_wikidata: el.tags?.['operator:wikidata'] || '',
+          // Concatena tutti i valori dei tag per un matching più ampio
+          allTags:  Object.values(el.tags || {}).join(' '),
           socket:   [
             el.tags?.['socket:type2']   ? 'Type2' : '',
             el.tags?.['socket:ccs2']    ? 'CCS' : '',
@@ -357,7 +360,8 @@ const app = {
 
           // Combina tutti i campi OSM rilevanti per il matching
           const opTitle = [
-            poi.operator, poi.brand, poi.network, poi.name, poi.operator_wikidata
+            poi.operator, poi.brand, poi.network, poi.name,
+            poi.operator_wikidata, poi.allTags
           ].filter(Boolean).join(' ').toLowerCase();
           const address = poi.name || poi.operator || '';
           const town    = '';
@@ -372,7 +376,7 @@ const app = {
             'enel x':       ['enel x','enel','juicepass'],
             'enel x / ewiva':['enel','ewiva'],
             // Plenitude / Be Charge / ENI
-            'plenitude':    ['plenitude','be charge','becharge','be power','bepower','eni gas','plenitude on the road'],
+            'plenitude':    ['plenitude','be charge','becharge','be_charge','be power','bepower','be-charge','eni gas','eni plenitude','plenitude on the road'],
             // Free To X / Autostrade
             'f2x':          ['free to x','free2x','f2x','freetox','autostrade'],
             'f2x':          ['free to x','free2x','f2x','freetox'],
