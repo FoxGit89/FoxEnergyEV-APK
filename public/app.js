@@ -433,14 +433,46 @@ const app = {
           'go electric station':['go electric'],
           // ChargePoint
           'charge poin +':['chargepoint','charge point'],
-          // Jet Strom
+          // Jet Strom (e nuovi operatori zona Italia)
+          // Repower (zona Milano)
+          'repower':      ['repower','recharge around','dinaclub'],
+          // Fastway
+          'fastway':      ['fastway'],
+          // Nextcharge
+          'nextcharge':   ['nextcharge'],
+          // E-Moving
+          'e-moving':     ['e-moving','emoving'],
           'jet strom':    ['jet strom','jetstrom'],
-        };
+          // Electrip
+          'electrip':     ['electrip','elec trip'],
+          // Powy
+          'powy':         ['powy'],
+          // Ewiva / Volkswagen Group Charging
+          'ewiva':        ['ewiva','volkswagen','vw','volkswagen group charging','elli'],
+          // Atlante / Nhoa Energy
+          'atlante':      ['atlante','nhoa','free electrons'],
+          // Electra (Italia e Francia)
+          'electra':      ['electra'],
+          'electriese':   ['electra'],
+          'alectriase':   ['electra'],
+          'electra france':['electra'],
+          // Ionity
+          'ionity':       ['ionity'],
+          // Tesla Supercharger
+          'tesla':        ['tesla'],
+          'volvo':        ['tesla','volvo'],
+          // Fastned
+          'fastned':      ['fastned'],
+          // Enel X Way (nuovo brand Enel X)
+          'enel x way':   ['enel x way','enel x','enel','juicepass'],
+          // Duferco
+          'duferco':      ['duferco','duferco energia'],
+          };
 
         // Normalizza: ogni operatore utente → lista di keywords OSM da cercare
         const userKeywords = []; // [{keywords:[...], cards:[...]}]
         userOps.forEach(op => {
-          const norm = OP_NORM[op] || [op]; // fallback: usa il nome così com'è
+          const norm = OP_NORM[op.toLowerCase()] || [op.toLowerCase()]; // chiave lowercase
           const existing = userKeywords.find(u => u.keywords.join() === norm.join());
           if (existing) {
             (cardToOps[op]||[]).forEach(c => { if(!existing.cards.includes(c)) existing.cards.push(c); });
