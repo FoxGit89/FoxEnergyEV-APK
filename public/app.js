@@ -352,13 +352,73 @@ const app = {
           const town    = '';
           const conns   = poi.socket ? poi.socket.replace('yes','').trim() : '';
 
-          // Matching: cerca se uno dei nomi operatori dell'utente è contenuto nel titolo OCM
-          const matchedCards = [];
+          // Dizionario di normalizzazione: varianti utente → keywords OSM
+          const OP_NORM = {
+            'enelx':['enel','juicepass','enel x'],
+            'enel x / ewiva':['enel','ewiva'],
+            'enel x':['enel','juicepass'],
+            'plenitude':['plenitude','eni','be charge','becharge'],
+            'f2x':['free to x','f2x','free2x'],
+            'free2x':['free to x','f2x'],
+            'free to x':['free to x','f2x'],
+            'freetox':['free to x','f2x'],
+            'atlante':['atlante'],
+            'electra':['electra'],
+            'electriese':['electra'],
+            'alectriase':['electra'],
+            'electriase':['electra'],
+            'electra france':['electra'],
+            'q8 electra':['q8','electra'],
+            'duferco':['duferco'],
+            'a2a':['a2a'],
+            'ionity':['ionity'],
+            'ewiva':['ewiva'],
+            'acea':['acea'],
+            'allego':['allego'],
+            'ayvens':['ayvens','arval'],
+            'ges':['ges'],
+            'iplanet':['ip planet','iplanet','ip charge'],
+            'ip planet':['ip planet','iplanet'],
+            'ip':['ip planet','iplanet'],
+            'ipplanet':['ip planet','iplanet'],
+            'powy':['powy'],
+            'electrip':['electrip'],
+            'neogy':['neogy'],
+            'ecotap':['ecotap'],
+            'eco tap':['ecotap'],
+            'volvo':['volvo'],
+            'energetix':['energetix'],
+            'edison':['edison'],
+            'alperia':['alperia'],
+            'nucleo':['nucleo'],
+            'evway':['evway'],
+            'emobitaly':['emobi'],
+            'estra':['estra'],
+            'eon':['e.on','eon'],
+            'total':['totalenergies','total'],
+            'go electric station':['go electric'],
+            'charge poin +':['chargepoint'],
+            'jet strom':['jet','strom'],
+            'a2a':['a2a'],
+          };
+
+          // Normalizza: ogni operatore utente → lista di keywords OSM da cercare
+          const userKeywords = []; // [{keywords:[...], cards:[...]}]
           userOps.forEach(op => {
-            if (opTitle.includes(op) || op.includes(opTitle.split(' ')[0])) {
-              (cardToOps[op] || []).forEach(card => {
-                if (!matchedCards.includes(card)) matchedCards.push(card);
-              });
+            const norm = OP_NORM[op] || [op]; // fallback: usa il nome così com'è
+            const existing = userKeywords.find(u => u.keywords.join() === norm.join());
+            if (existing) {
+              (cardToOps[op]||[]).forEach(c => { if(!existing.cards.includes(c)) existing.cards.push(c); });
+            } else {
+              userKeywords.push({ keywords: norm, cards: [...(cardToOps[op]||[])] });
+            }
+          });
+
+          // Matching: cerca se una keyword è contenuta nel titolo OSM (case-insensitive)
+          const matchedCards = [];
+          userKeywords.forEach(({keywords, cards}) => {
+            if (keywords.some(kw => opTitle.includes(kw))) {
+              cards.forEach(c => { if(!matchedCards.includes(c)) matchedCards.push(c); });
             }
           });
 
