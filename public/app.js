@@ -1336,7 +1336,7 @@ window.bleEngine = {
         await this.ultra.cmdSlotChangeTagType(slotIdx,profile.tagType);
         await this.ultra.cmdSlotResetTagType(slotIdx,profile.tagType);
         await this.ultra.cmdSlotSetEnable(slotIdx,FreqType.HF,true);
-        await new Promise(r=>setTimeout(r,50));
+        await new Promise(r=>setTimeout(r,150));
         await this.ultra.cmdSlotSetFreqName(slotIdx,FreqType.HF,card.slot_label);
         await this.ultra.cmdHf14aSetAntiCollData({uid:profile.uid,atqa:profile.atqa,sak:profile.sak,ats:profile.ats});
 
@@ -1350,12 +1350,12 @@ window.bleEngine = {
               break;
             } catch(e) {
               if (attempt===2) throw e; // fallisce dopo 3 tentativi
-              await new Promise(r=>setTimeout(r,300)); // pausa prima di retry
+              await new Promise(r=>setTimeout(r,600)); // pausa prima di retry
             }
           }
           // Pausa ogni 16 blocchi per dare respiro al BLE
           if (block>0 && block%16===0) {
-            await new Promise(r=>setTimeout(r,80));
+            await new Promise(r=>setTimeout(r,150));
           }
           if (block%8===0||block===profile.numBlocks-1) {
             const wp=base+(80/total)*0.5+(80/total)*0.45*(block/profile.numBlocks);
@@ -1364,16 +1364,16 @@ window.bleEngine = {
         }
         loadedLabels.push(card.slot_label);
         this.updateUI(base+(80/total)*0.98,`Slot ${slotIdx+1} scritto ✓`,'working');
-        await new Promise(r=>setTimeout(r,150));
+        await new Promise(r=>setTimeout(r,300));
       }
 
       this.updateUI(92,'💾 Salvataggio...','working');
       await this.ultra.cmdSlotSaveSettings();
-      await new Promise(r=>setTimeout(r,150));
+      await new Promise(r=>setTimeout(r,500));
 
       this.updateUI(96,'🔄 Attivazione TAG...','working');
       await this.ultra.cmdChangeDeviceMode(DeviceMode.READER);
-      await new Promise(r=>setTimeout(r,300));
+      await new Promise(r=>setTimeout(r,600));
       await this.ultra.cmdChangeDeviceMode(DeviceMode.TAG);
 
       // BLE rimane connesso — avvia sessione sicura
@@ -1433,11 +1433,11 @@ window.bleEngine = {
       await this.ultra.cmdSlotResetTagType(i,TagType.MIFARE_1024);
       await this.ultra.cmdSlotSetEnable(i,FreqType.HF,false);
       await this.ultra.cmdSlotDeleteFreqName(i,FreqType.HF).catch(()=>{});
-      await new Promise(r=>setTimeout(r,30));
+      await new Promise(r=>setTimeout(r,100));
       setWipe('🗑️','CANCELLAZIONE IN CORSO',`Slot ${i+1}/8 cancellato...`);
     }
     await this.ultra.cmdSlotSaveSettings();
-    await new Promise(r=>setTimeout(r,100));
+    await new Promise(r=>setTimeout(r,1500));
     await this.ultra.cmdChangeDeviceMode(DeviceMode.TAG);
     await this.ultra.disconnect();
     this.ultra=null;
