@@ -262,18 +262,7 @@ const app = {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   },
 
-  // Log BLE visibile in-app (utile per debug senza console)
-  _bleLog(msg, isError=false) {
-    const ts = new Date().toLocaleTimeString('it-IT');
-    const line = `[${ts}] ${msg}`;
-    console.log('[BLE]', msg);
-    const panel = document.getElementById('ble-debug-panel');
-    const log   = document.getElementById('ble-debug-log');
-    if (!panel || !log) return;
-    log.textContent += line + '\n';
-    log.scrollTop = log.scrollHeight;
-    if (isError) panel.classList.remove('hidden');
-  },
+  // _bleLog → definito in bleEngine
 
 
   _opColor(name) {
@@ -1221,6 +1210,18 @@ const secureSession = {
 window.bleEngine = {
   ultra: null,
 
+  _bleLog(msg, isError=false) {
+    const ts = new Date().toLocaleTimeString('it-IT');
+    const line = `[${ts}] ${msg}`;
+    console.log('[BLE]', msg);
+    const panel = document.getElementById('ble-debug-panel');
+    const log   = document.getElementById('ble-debug-log');
+    if (!panel || !log) return;
+    log.textContent += line + '\n';
+    log.scrollTop = log.scrollHeight;
+    if (isError) panel.classList.remove('hidden');
+  },
+
   // ── Schermata connect-screen ──
   setConnectStatus(icon, title, msg, showBtn=false) {
     document.getElementById('connect-icon').textContent=icon;
@@ -1300,7 +1301,7 @@ window.bleEngine = {
       document.getElementById('connect-config-section').classList.remove('hidden');
 
     } catch(err) {
-      this._bleLog('ERRORE: ' + (err.message||String(err)), true);
+      bleEngine._bleLog('ERRORE: ' + (err.message||String(err)), true);
       this.setConnectStatus('❌','ERRORE CONNESSIONE',`${err.message}\n\nAssicurati che il Bluetooth sia attivo.\n\n🔧 Vedi il log debug qui sopra e premi "Copia log" per mandarcelo.`,true);
       if (this.ultra){try{await this.ultra.disconnect();}catch(e){} this.ultra=null;}
     }
