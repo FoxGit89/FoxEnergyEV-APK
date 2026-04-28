@@ -188,12 +188,13 @@ const app = {
     const list=document.getElementById('connect-slot-list');
     if (list) {
       list.innerHTML='';
-      for (let i=1;i<=8;i++) {
+      const SLOTS = [1, 5, 8]; // slot fisici supportati V1/V2/V3/V4
+      for (const i of SLOTS) {
         const card=this.mapping[i]; if(card)canSync=true;
         const div=document.createElement('div');
         div.className=`slot-card ${card?'active':''}`;
         div.onclick=()=>this.openSlotPicker(i);
-        div.innerHTML=`<div class="slot-num">${i}</div><div class="slot-title">${card?card.slot_label:'Nessun dato assegnato'}</div><div class="slot-icon">📝</div>`;
+        div.innerHTML=`<div class="slot-num">${i}</div><div class="slot-title">${card?card.slot_label:'Slot libero'}</div><div class="slot-icon">📝</div>`;
         list.appendChild(div);
       }
     }
@@ -1240,6 +1241,19 @@ window.bleEngine = {
       await this.ultra.use(new window.ChameleonUltraJS.WebbleAdapter());
       await this.ultra.connect();
 
+      // Rileva hardware version tramite cmdGetDeviceModel e cmdGetAppVersion
+      // V1 hw = modelli con firmware < 2.0 o che non supportano alcuni comandi
+      this.hwVersion = 2; // default sicuro
+      try {
+        // cmdGetDeviceModel: 0 = Ultra, 1 = Lite (non discrimina V1 vs V2)
+        // cmdGetAppVersion: restituisce {major, minor} — V1 tipicamente ha major=1
+        const ver = await this.ultra.cmdGetAppVersion();
+        if (ver?.major !== undefined && ver.major < 2) {
+          this.hwVersion = 1;
+        }
+      } catch(e) { /* non bloccante — usa default V2 */ }
+      console.log('[BLE] HW Version rilevata: V' + this.hwVersion + ' (via cmdGetAppVersion)');
+
       this.setConnectStatus('🔍','LETTURA IN CORSO','Lettura configurazione attuale...');
       const slotSnapshot = [];
       for (let i=0; i<8; i++) {
@@ -1296,15 +1310,32 @@ window.bleEngine = {
       const { TagType, FreqType, DeviceMode } = window.ChameleonUltraJS;
       if (!this.ultra) throw new Error('Dispositivo non connesso. Torna indietro e riconnetti.');
 
+      // Solo slot 1, 5, 8 — compatibili V1/V2/V3/V4
+      const ALLOWED_SLOTS = [1, 5, 8];
       const slotsToWrite=[];
-      for (let i=1;i<=8;i++) if(mapping[i]) slotsToWrite.push({slotIdx:i-1,card:mapping[i]});
+      for (let i=1;i<=8;i++) {
+        if(mapping[i] && ALLOWED_SLOTS.includes(i))
+          slotsToWrite.push({slotIdx:i-1, slotNum:i, card:mapping[i]});
+      }
       if (slotsToWrite.length===0) throw new Error('Nessuno slot selezionato.');
 
       this.updateUI(5,'🧹 Reset globale degli slot...','working');
+
+      // V1: wipe flash prima del loop per azzerare stato inconsistente (bug seconda sessione)
+      // cmdWipeFds azzera TUTTI i dati flash (slot + settings) — equivale a factory_reset
+      if (bleEngine.hwVersion === 1) {
+        this.updateUI(5,'🔄 Pulizia flash V1...','working');
+        try { await this.ultra.cmdWipeFds(); } catch(e) {}
+        await new Promise(r=>setTimeout(r,1200)); // più lungo: flash write richiede tempo
+      }
+
       for (let i=0;i<8;i++) {
-        await this.ultra.cmdSlotChangeTagType(i,TagType.MIFARE_1024);
-        await this.ultra.cmdSlotResetTagType(i,TagType.MIFARE_1024);
-        await this.ultra.cmdSlotSetEnable(i,FreqType.HF,false);
+        // try/catch su ogni op: se V1 fallisce non genera throw → no logout
+        try { await this.ultra.cmdSlotChangeTagType(i,TagType.MIFARE_1024); }
+        catch(e) { await new Promise(r=>setTimeout(r,300)); try { await this.ultra.cmdSlotChangeTagType(i,TagType.MIFARE_1024); } catch(e2){} }
+        try { await this.ultra.cmdSlotResetTagType(i,TagType.MIFARE_1024); }
+        catch(e) { await new Promise(r=>setTimeout(r,300)); try { await this.ultra.cmdSlotResetTagType(i,TagType.MIFARE_1024); } catch(e2){} }
+        await this.ultra.cmdSlotSetEnable(i,FreqType.HF,false).catch(()=>{});
         await this.ultra.cmdSlotDeleteFreqName(i,FreqType.HF).catch(()=>{});
         await new Promise(r=>setTimeout(r,150)); // TIMING UNIVERSALE
       }
@@ -1417,6 +1448,13 @@ window.bleEngine = {
       setWipe('🗑️','CANCELLAZIONE IN CORSO',`Slot ${i+1}/8 cancellato...`);
     }
     
+    // V1: wipe flash DOPO la cancellazione slot per garantire stato pulito alla prossima sessione
+    // cmdWipeFds è l'equivalente software di factory_reset --force via CLI
+    if (this.hwVersion === 1) {
+      try { await this.ultra.cmdWipeFds(); } catch(e) {}
+      await new Promise(r=>setTimeout(r,1200));
+    }
+
     await this.ultra.cmdSlotSaveSettings();
     await new Promise(r=>setTimeout(r,1000)); // Tempo lungo per salvataggio Flash
 
