@@ -1081,3 +1081,12 @@ input {
 .how-to-dots { display:flex; justify-content:center; gap:5px; padding:4px 0 0; }
 .how-to-dot  { width:6px; height:3px; border-radius:2px; background:rgba(255,255,255,0.2); cursor:pointer; transition:all 0.3s; }
 .how-to-dot.active { width:16px; background:var(--primary-orange); }
+
+/* BLE Debug Panel */
+.ble-debug-panel {
+  margin: 10px 15px;
+  background: rgba(0,0,0,0.6);
+  border: 0.5px solid rgba(255,152,0,0.3);
+  border-radius: 12px;
+  padding: 12px 14px;
+}

@@ -5,8 +5,8 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
   <title>FoxSync by Fox Energy EV</title>
   <meta name="theme-color" content="#FF9800">
-  <link rel="manifest" href="manifest.json?v=72">
-  <link rel="stylesheet" href="style.css?v=72">
+  <link rel="manifest" href="manifest.json?v=74">
+  <link rel="stylesheet" href="style.css?v=74">
   <!-- Leaflet per mappa colonnine -->
   <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css"/>
   <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
@@ -187,6 +187,19 @@
 
   <!-- Screen 4: Connessione e lettura slot -->
   <div id="connect-screen" class="screen hidden">
+    <!-- BLE Debug Log (visibile solo in caso di errore) -->
+    <div id="ble-debug-panel" class="ble-debug-panel hidden">
+      <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:6px">
+        <span style="color:#FF9800;font-size:11px;font-weight:700">🔧 BLE Debug Log</span>
+        <button onclick="document.getElementById('ble-debug-panel').classList.add('hidden')"
+          style="background:none;border:none;color:rgba(255,255,255,0.4);font-size:16px;cursor:pointer">✕</button>
+      </div>
+      <div id="ble-debug-log" style="font-size:10px;color:rgba(255,255,255,0.7);line-height:1.8;font-family:monospace;max-height:200px;overflow-y:auto;white-space:pre-wrap"></div>
+      <button onclick="navigator.clipboard?.writeText(document.getElementById('ble-debug-log').textContent).then(()=>alert('Log copiato!'))"
+        style="margin-top:8px;background:rgba(255,152,0,0.15);border:0.5px solid rgba(255,152,0,0.3);border-radius:8px;color:#FF9800;font-size:11px;padding:6px 12px;cursor:pointer;width:100%">
+        📋 Copia log per assistenza
+      </button>
+    </div>
     <div class="app-header">
       <button class="header-back" onclick="app.showScreen('dashboard-screen')">◀</button>
       Connessione Chameleon
@@ -340,6 +353,6 @@
     </div>
   </div>
 
-  <script src="app.js?v=72"></script>
+  <script src="app.js?v=74"></script>
 </body>
 </html>

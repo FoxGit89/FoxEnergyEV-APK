@@ -262,6 +262,20 @@ const app = {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   },
 
+  // Log BLE visibile in-app (utile per debug senza console)
+  _bleLog(msg, isError=false) {
+    const ts = new Date().toLocaleTimeString('it-IT');
+    const line = `[${ts}] ${msg}`;
+    console.log('[BLE]', msg);
+    const panel = document.getElementById('ble-debug-panel');
+    const log   = document.getElementById('ble-debug-log');
+    if (!panel || !log) return;
+    log.textContent += line + '
+';
+    log.scrollTop = log.scrollHeight;
+    if (isError) panel.classList.remove('hidden');
+  },
+
 
   _opColor(name) {
     const PALS=[
@@ -1241,18 +1255,20 @@ window.bleEngine = {
       await this.ultra.use(new window.ChameleonUltraJS.WebbleAdapter());
       await this.ultra.connect();
 
-      // Rileva hardware version tramite cmdGetDeviceModel e cmdGetAppVersion
-      // V1 hw = modelli con firmware < 2.0 o che non supportano alcuni comandi
-      this.hwVersion = 2; // default sicuro
+      // Rileva versione firmware per workaround compatibilità
+      // Firmware < 2.0: comportamento diverso su wipe/reset slot
+      this.hwVersion = 2; // default: firmware moderno
+      this.fwMajor   = 2;
+      this.fwMinor   = 0;
       try {
-        // cmdGetDeviceModel: 0 = Ultra, 1 = Lite (non discrimina V1 vs V2)
-        // cmdGetAppVersion: restituisce {major, minor} — V1 tipicamente ha major=1
         const ver = await this.ultra.cmdGetAppVersion();
-        if (ver?.major !== undefined && ver.major < 2) {
-          this.hwVersion = 1;
+        if (ver?.major !== undefined) {
+          this.fwMajor   = parseInt(ver.major) || 2;
+          this.fwMinor   = parseInt(ver.minor) || 0;
+          this.hwVersion = this.fwMajor < 2 ? 1 : 2;
         }
-      } catch(e) { /* non bloccante — usa default V2 */ }
-      console.log('[BLE] HW Version rilevata: V' + this.hwVersion + ' (via cmdGetAppVersion)');
+      } catch(e) { /* non bloccante */ }
+      this._bleLog(`Firmware: v${this.fwMajor}.${this.fwMinor} → workaround firmware vecchio: ${this.hwVersion===1?'ATTIVO':'off'}`);
 
       this.setConnectStatus('🔍','LETTURA IN CORSO','Lettura configurazione attuale...');
       const slotSnapshot = [];
@@ -1297,9 +1313,10 @@ window.bleEngine = {
       document.getElementById('connect-config-section').classList.remove('hidden');
 
     } catch(err) {
-      console.error('[CONNECT ERROR]',err);
+    } catch(err) {
+      this._bleLog('ERRORE: ' + (err.message||String(err)), true);
       this.setConnectStatus('❌','ERRORE CONNESSIONE',`${err.message}\n\nAssicurati che il Bluetooth sia attivo. Se il dispositivo non risponde, riavvialo.`,true);
-      if (this.ultra){try{await this.ultra.disconnect();}catch(e){} this.ultra=null;}
+      this.setConnectStatus('❌','ERRORE CONNESSIONE',`${err.message}\n\nAssicurati che il Bluetooth sia attivo.\n\n🔧 Vedi il log debug qui sopra e premi "Copia log" per mandarcelo.`,true);
     }
   },
 
@@ -1321,20 +1338,41 @@ window.bleEngine = {
 
       this.updateUI(5,'🧹 Reset globale degli slot...','working');
 
-      // V1: wipe flash prima del loop per azzerare stato inconsistente (bug seconda sessione)
-      // cmdWipeFds azzera TUTTI i dati flash (slot + settings) — equivale a factory_reset
+      // Firmware vecchio (<2.0): wipe flash per azzerare stato inconsistente
+      // cmdWipeFds = equivalente di factory_reset --force — azzeramento completo flash
       if (bleEngine.hwVersion === 1) {
-        this.updateUI(5,'🔄 Pulizia flash V1...','working');
-        try { await this.ultra.cmdWipeFds(); } catch(e) {}
-        await new Promise(r=>setTimeout(r,1200)); // più lungo: flash write richiede tempo
+        this.updateUI(5,'🔄 Reset firmware...','working');
+        try {
+          const supported = await this.ultra.cmdGetSupportedCmds().catch(()=>null);
+          const wipeCmdId = 1014;
+          if (!supported || supported.includes(wipeCmdId)) {
+            await this.ultra.cmdWipeFds();
+            bleEngine._bleLog('cmdWipeFds OK (flash azzerato)');
+          } else {
+            bleEngine._bleLog('cmdWipeFds non supportato da questo firmware, skip', true);
+          }
+        } catch(e) {
+          bleEngine._bleLog('cmdWipeFds ERRORE: ' + (e.message||e), true);
+        }
+        await new Promise(r=>setTimeout(r,1200));
       }
 
       for (let i=0;i<8;i++) {
         // try/catch su ogni op: se V1 fallisce non genera throw → no logout
         try { await this.ultra.cmdSlotChangeTagType(i,TagType.MIFARE_1024); }
-        catch(e) { await new Promise(r=>setTimeout(r,300)); try { await this.ultra.cmdSlotChangeTagType(i,TagType.MIFARE_1024); } catch(e2){} }
+        catch(e) {
+          bleEngine._bleLog(`cmdSlotChangeTagType slot ${i} retry (${e.message||e})`, true);
+          await new Promise(r=>setTimeout(r,300));
+          try { await this.ultra.cmdSlotChangeTagType(i,TagType.MIFARE_1024); }
+          catch(e2){ bleEngine._bleLog(`cmdSlotChangeTagType slot ${i} fallito dopo retry`, true); }
+        }
         try { await this.ultra.cmdSlotResetTagType(i,TagType.MIFARE_1024); }
-        catch(e) { await new Promise(r=>setTimeout(r,300)); try { await this.ultra.cmdSlotResetTagType(i,TagType.MIFARE_1024); } catch(e2){} }
+        catch(e) {
+          bleEngine._bleLog(`cmdSlotResetTagType slot ${i} retry (${e.message||e})`, true);
+          await new Promise(r=>setTimeout(r,300));
+          try { await this.ultra.cmdSlotResetTagType(i,TagType.MIFARE_1024); }
+          catch(e2){ bleEngine._bleLog(`cmdSlotResetTagType slot ${i} fallito dopo retry`, true); }
+        }
         await this.ultra.cmdSlotSetEnable(i,FreqType.HF,false).catch(()=>{});
         await this.ultra.cmdSlotDeleteFreqName(i,FreqType.HF).catch(()=>{});
         await new Promise(r=>setTimeout(r,150)); // TIMING UNIVERSALE
@@ -1448,10 +1486,16 @@ window.bleEngine = {
       setWipe('🗑️','CANCELLAZIONE IN CORSO',`Slot ${i+1}/8 cancellato...`);
     }
     
-    // V1: wipe flash DOPO la cancellazione slot per garantire stato pulito alla prossima sessione
-    // cmdWipeFds è l'equivalente software di factory_reset --force via CLI
+    // Firmware vecchio: wipe flash dopo cancellazione per garantire stato pulito
+    // Questo risolve il bug "seconda sessione" su SE/SE2 con firmware <2.0
     if (this.hwVersion === 1) {
-      try { await this.ultra.cmdWipeFds(); } catch(e) {}
+      try {
+        const supported = await this.ultra.cmdGetSupportedCmds().catch(()=>null);
+        const wipeCmdId = 1014;
+        if (!supported || supported.includes(wipeCmdId)) {
+          await this.ultra.cmdWipeFds();
+        }
+      } catch(e) { console.warn('[BLE] cmdWipeFds non supportato:', e.message); }
       await new Promise(r=>setTimeout(r,1200));
     }
 
