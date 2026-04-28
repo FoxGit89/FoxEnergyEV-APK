@@ -270,8 +270,7 @@ const app = {
     const panel = document.getElementById('ble-debug-panel');
     const log   = document.getElementById('ble-debug-log');
     if (!panel || !log) return;
-    log.textContent += line + '
-';
+    log.textContent += line + '\n';
     log.scrollTop = log.scrollHeight;
     if (isError) panel.classList.remove('hidden');
   },
@@ -1313,10 +1312,9 @@ window.bleEngine = {
       document.getElementById('connect-config-section').classList.remove('hidden');
 
     } catch(err) {
-    } catch(err) {
       this._bleLog('ERRORE: ' + (err.message||String(err)), true);
-      this.setConnectStatus('❌','ERRORE CONNESSIONE',`${err.message}\n\nAssicurati che il Bluetooth sia attivo. Se il dispositivo non risponde, riavvialo.`,true);
       this.setConnectStatus('❌','ERRORE CONNESSIONE',`${err.message}\n\nAssicurati che il Bluetooth sia attivo.\n\n🔧 Vedi il log debug qui sopra e premi "Copia log" per mandarcelo.`,true);
+      if (this.ultra){try{await this.ultra.disconnect();}catch(e){} this.ultra=null;}
     }
   },
 
