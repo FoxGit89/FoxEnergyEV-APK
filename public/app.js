@@ -1244,7 +1244,7 @@ window.bleEngine = {
 
   // ── PASSO 1: Connetti e pulisci ──
   async connectAndRead(telegramId) {
-    this.setConnectStatus('📶','CONNESSIONE IN CORSO','Seleziona il Chameleon Ultra nel popup Bluetooth...');
+    this.setConnectStatus('📶','CONNESSIONE IN CORSO','Seleziona il dispositivo nel popup e premi Accoppia...');
     try {
       const { ChameleonUltra, TagType, FreqType, DeviceMode } = window.ChameleonUltraJS;
       
@@ -1253,23 +1253,32 @@ window.bleEngine = {
       this.ultra = new ChameleonUltra();
       await this.ultra.use(new window.ChameleonUltraJS.WebbleAdapter());
       await this.ultra.connect();
+      
+      // Aggiorna subito UI — dispositivo connesso, popup chiuso
+      this.setConnectStatus('🔗','CONNESSO','Rilevamento firmware in corso...');
+      await new Promise(r=>setTimeout(r,300)); // pausa post-connect per stabilizzare BLE
 
-      // Rileva versione firmware per workaround compatibilità
-      // Firmware < 2.0: comportamento diverso su wipe/reset slot
-      this.hwVersion = 2; // default: firmware moderno
+      // Rileva versione firmware con timeout — su firmware vecchi cmdGetAppVersion
+      // può bloccarsi indefinitamente invece di lanciare eccezione
+      this.hwVersion = 2;
       this.fwMajor   = 2;
       this.fwMinor   = 0;
       try {
-        const ver = await this.ultra.cmdGetAppVersion();
+        const verPromise = this.ultra.cmdGetAppVersion();
+        const timeoutPromise = new Promise((_,rej) => setTimeout(()=>rej(new Error('timeout')), 3000));
+        const ver = await Promise.race([verPromise, timeoutPromise]);
         if (ver?.major !== undefined) {
           this.fwMajor   = parseInt(ver.major) || 2;
           this.fwMinor   = parseInt(ver.minor) || 0;
           this.hwVersion = this.fwMajor < 2 ? 1 : 2;
         }
-      } catch(e) { /* non bloccante */ }
-      this._bleLog(`Firmware: v${this.fwMajor}.${this.fwMinor} → workaround firmware vecchio: ${this.hwVersion===1?'ATTIVO':'off'}`);
+      } catch(e) {
+        // timeout o errore: assume firmware moderno, continua
+        this._bleLog(`cmdGetAppVersion: ${e.message} — assume firmware moderno`);
+      }
+      this._bleLog(`Firmware: v${this.fwMajor}.${this.fwMinor} → workaround: ${this.hwVersion===1?'ATTIVO':'off'}`);
 
-      this.setConnectStatus('🔍','LETTURA IN CORSO','Lettura configurazione attuale...');
+      this.setConnectStatus('🔍','LETTURA IN CORSO','Dispositivo rilevato, lettura slot...');
       const slotSnapshot = [];
       for (let i=0; i<8; i++) {
         let name = null, uid = null;
