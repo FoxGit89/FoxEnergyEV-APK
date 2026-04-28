@@ -1258,25 +1258,11 @@ window.bleEngine = {
       this.setConnectStatus('🔗','CONNESSO','Rilevamento firmware in corso...');
       await new Promise(r=>setTimeout(r,300)); // pausa post-connect per stabilizzare BLE
 
-      // Rileva versione firmware con timeout — su firmware vecchi cmdGetAppVersion
-      // può bloccarsi indefinitamente invece di lanciare eccezione
-      this.hwVersion = 2;
-      this.fwMajor   = 2;
-      this.fwMinor   = 0;
-      try {
-        const verPromise = this.ultra.cmdGetAppVersion();
-        const timeoutPromise = new Promise((_,rej) => setTimeout(()=>rej(new Error('timeout')), 3000));
-        const ver = await Promise.race([verPromise, timeoutPromise]);
-        if (ver?.major !== undefined) {
-          this.fwMajor   = parseInt(ver.major) || 2;
-          this.fwMinor   = parseInt(ver.minor) || 0;
-          this.hwVersion = this.fwMajor < 2 ? 1 : 2;
-        }
-      } catch(e) {
-        // timeout o errore: assume firmware moderno, continua
-        this._bleLog(`cmdGetAppVersion: ${e.message} — assume firmware moderno`);
-      }
-      this._bleLog(`Firmware: v${this.fwMajor}.${this.fwMinor} → workaround: ${this.hwVersion===1?'ATTIVO':'off'}`);
+      // Workaround universale attivo per tutti i dispositivi
+      // cmdWipeFds e retry su cmdSlotChange sono no-op su firmware moderni
+      // ma salvano la sessione su firmware vecchi (SE/SE2 con fw <2.0)
+      this.hwVersion = 1; // workaround SEMPRE attivo — sicuro su tutti i modelli
+      this._bleLog('Workaround universale attivo (compatibile SE/SE2/SE3)');
 
       this.setConnectStatus('🔍','LETTURA IN CORSO','Dispositivo rilevato, lettura slot...');
       const slotSnapshot = [];
