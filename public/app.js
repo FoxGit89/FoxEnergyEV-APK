@@ -1254,17 +1254,10 @@ window.bleEngine = {
       await this.ultra.use(new window.ChameleonUltraJS.WebbleAdapter());
       await this.ultra.connect();
       
-      // Aggiorna subito UI — dispositivo connesso, popup chiuso
-      this.setConnectStatus('🔗','CONNESSO','Rilevamento firmware in corso...');
-      await new Promise(r=>setTimeout(r,300)); // pausa post-connect per stabilizzare BLE
+      this.hwVersion = 1; // workaround universale — sicuro su tutti i modelli SE/SE2/SE3
+      await new Promise(r=>setTimeout(r,300)); // stabilizza BLE post-connect
 
-      // Workaround universale attivo per tutti i dispositivi
-      // cmdWipeFds e retry su cmdSlotChange sono no-op su firmware moderni
-      // ma salvano la sessione su firmware vecchi (SE/SE2 con fw <2.0)
-      this.hwVersion = 1; // workaround SEMPRE attivo — sicuro su tutti i modelli
-      this._bleLog('Workaround universale attivo (compatibile SE/SE2/SE3)');
-
-      this.setConnectStatus('🔍','LETTURA IN CORSO','Dispositivo rilevato, lettura slot...');
+      this.setConnectStatus('🔍','LETTURA IN CORSO','Chameleon connesso, lettura slot...');
       const slotSnapshot = [];
       for (let i=0; i<8; i++) {
         let name = null, uid = null;
