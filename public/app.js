@@ -467,12 +467,17 @@ const app = {
 
         let popupHtml = `<div style="min-width:180px;font-family:sans-serif">`;
         popupHtml += `<b style="font-size:13px">${icon} ${this._esc(poi.title)}</b>`;
-        const opDisplay = poi.operator || 'Operatore Sconosciuto';
-        popupHtml += `<div style="margin-top:4px;font-size:12px">🏢 ${this._esc(opDisplay)}</div>`;
+        const opDisplay = poi.operator || '';
+        if (opDisplay) {
+            popupHtml += `<div style="margin-top:4px;font-size:12px;font-weight:600;color:#FF9800;">${this._esc(opDisplay)}</div>`;
+        }
+        
+        const connDisplay = poi.connections_info || 'Info prese non disponibili';
+        popupHtml += `<div style="margin-top:4px;font-size:12px;color:#ccc;">🔌 ${this._esc(connDisplay)}</div>`;
         
         if (poi.is_supported) {
-          popupHtml += `<div style="margin-top:8px;padding:6px 8px;background:#E8F5E9;border-radius:6px;font-size:12px">`;
-          popupHtml += `<b style="color:#2E7D32">✅ Usa queste tessere:</b><br>`;
+          popupHtml += `<div style="margin-top:8px;padding:6px 8px;background:rgba(76, 175, 80, 0.15);border: 1px solid rgba(76, 175, 80, 0.3);border-radius:6px;font-size:12px;color:#fff;">`;
+          popupHtml += `<b style="color:#4CAF50">✅ Usa queste tessere:</b><br>`;
           (poi.matched_slots || []).forEach(c => { popupHtml += `• ${this._esc(c)}<br>`; });
           popupHtml += `</div>`;
         } else {

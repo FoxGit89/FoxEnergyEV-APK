@@ -808,7 +808,7 @@ try {
             exit;
         }
 
-        $ocm_url = "https://api.openchargemap.io/v3/poi?output=json&latitude={$lat}&longitude={$lng}&distance={$rad}&distanceunit=KM&maxresults=150&compact=true&verbose=false";
+        $ocm_url = "https://api.openchargemap.io/v3/poi?output=json&latitude={$lat}&longitude={$lng}&distance={$rad}&distanceunit=KM&maxresults=150&verbose=false";
         
         $ch = curl_init();
         curl_setopt($ch, CURLOPT_URL, $ocm_url);
@@ -831,6 +831,26 @@ try {
             $lng_poi = $poi['AddressInfo']['Longitude'] ?? 0;
             $title = $poi['AddressInfo']['Title'] ?? '';
             $operator = $poi['OperatorInfo']['Title'] ?? '';
+
+            // Estrai info sulle prese
+            $connections = [];
+            if (isset($poi['Connections']) && is_array($poi['Connections'])) {
+                foreach ($poi['Connections'] as $conn) {
+                    $type = $conn['ConnectionType']['Title'] ?? 'Sconosciuta';
+                    $type = str_replace(' (Mennekes) - Tethered Cable', '', $type);
+                    $type = str_replace(' (Mennekes) - Socket', '', $type);
+                    $type = str_replace('CCS (Type 2)', 'CCS', $type);
+                    $qty = $conn['Quantity'] ?? 1;
+                    $power = isset($conn['PowerKW']) ? round($conn['PowerKW']) . 'kW' : '';
+                    
+                    $conn_str = "{$qty}x {$type}";
+                    if ($power) {
+                        $conn_str .= " ({$power})";
+                    }
+                    $connections[] = $conn_str;
+                }
+            }
+            $connections_info = empty($connections) ? 'Nessuna info prese' : implode(', ', $connections);
             
             // Unisci title e operator in lowercase per la ricerca
             $search_str = strtolower($title . ' ' . $operator);
@@ -861,6 +881,7 @@ try {
                 'lng' => $lng_poi,
                 'title' => $title,
                 'operator' => $operator,
+                'connections_info' => $connections_info,
                 'is_supported' => $is_supported,
                 'matched_slots' => $matched_slots
             ];
