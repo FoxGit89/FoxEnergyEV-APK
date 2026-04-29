@@ -92,15 +92,20 @@
         <span class="tg-bot-arrow">›</span>
       </a>
 
-      <!-- Widget Mappa Colonnine (Sostituisce i gestori compatibili) -->
-      <div class="dash-map-widget" onclick="app.showMap()">
-        <div id="dash-mini-map" class="dash-mini-map"></div>
-        <div class="dash-map-overlay">
-          <div class="dash-map-text">📍 Tocca per aprire la Mappa Colonnine</div>
-        </div>
-      </div>
-
       <!-- Carosello istruzioni (occupa lo spazio rimanente) -->
+    <!-- Sezione gestori compatibili -->
+    <div id="dash-gestori-section" class="dash-gestori-section hidden">
+      <div class="dash-gestori-header">
+        <span class="dash-gestori-title">⚡ Reti compatibili</span>
+        <span id="dash-gestori-count" class="dash-gestori-badge"></span>
+      </div>
+      <div id="dash-gestori-track" class="dash-gestori-track"></div>
+      <div class="dash-gestori-legend">
+        <div class="dash-gestori-legend-item"><span class="dash-gestori-uses used" style="font-size:9px;padding:1px 5px">3×</span>n. utilizzi confermati</div>
+        <div class="dash-gestori-legend-item"><span class="dash-gestori-dot new" style="width:9px;height:9px;border-radius:3px"></span>mai usata</div>
+      </div>
+    </div>
+
       <div class="how-to-section">
         <div class="how-to-carousel-wrap">
           <div class="how-to-carousel" id="how-to-carousel">
@@ -153,48 +158,11 @@
             <span class="tab-label">Messaggi</span>
             <span id="broadcasts-badge" class="tab-badge hidden">0</span>
           </button>
-          <button class="tab-btn" onclick="app.showMap()">
-            <span class="tab-icon">🗺️</span>
-            <span class="tab-label">Mappa</span>
-          </button>
+
         </div>
       </div>
 
     </div><!-- /dash-layout -->
-  </div>
-
-  <!-- Screen Map -->
-  <div id="map-screen" class="screen hidden" style="display:flex;flex-direction:column;height:100vh;overflow:hidden;background:#000;">
-    <div class="app-header" style="flex-shrink:0;">
-      <button class="header-back" onclick="app.showScreen('dashboard-screen')">◀</button>
-      Mappa Colonnine
-    </div>
-    <div id="leaflet-map" style="flex:1; width:100%; position:relative; z-index:1;">
-      <div id="map-loading" style="position:absolute; inset:0; background:rgba(0,0,0,0.7); z-index:1000; display:flex; flex-direction:column; align-items:center; justify-content:center; color:white;">
-        <div class="spinner"></div>
-        <div id="map-loading-text" style="margin-top:10px; font-weight:600;">Rilevamento posizione...</div>
-      </div>
-      <div class="map-legend">
-        <div class="map-legend-item">
-          <div class="map-dot green"></div> Attivabile con FOX Energy
-        </div>
-        <div class="map-legend-item">
-          <div class="map-dot grey"></div> Non supportata / da verificare
-        </div>
-      </div>
-
-      <!-- Disclaimer Mappa -->
-      <div id="map-disclaimer" class="map-disclaimer">
-        <button class="map-disclaimer-close" onclick="document.getElementById('map-disclaimer').style.display='none'">✕</button>
-        <div style="font-weight:700;margin-bottom:4px;color:#FF9800;">⚠️ Attenzione</div>
-        Non tutte le colonnine sono visibili. Le tue tessere potrebbero attivare colonnine non in elenco, o non attivare alcune di quelle mostrate.
-      </div>
-
-      <!-- Pulsante Centra Posizione -->
-      <button id="map-location-btn" class="map-location-btn" onclick="app.centerMapOnUser()">
-        🎯
-      </button>
-    </div>
   </div>
 
   <!-- Screen 3: Stats -->
@@ -387,6 +355,108 @@
     </div>
   </div>
 
-  <script src="app.js?v=75"></script>
+  <!-- ==========================================
+     Schermata Post-Wipe: Feedback sessione
+     ========================================== -->
+<div id="feedback-screen" class="screen hidden">
+  <div class="app-header" style="background:linear-gradient(135deg,#1B5E20,#388E3C)">
+    <span style="font-family:var(--font-tech);letter-spacing:1.5px">🦊 SESSIONE COMPLETATA</span>
+  </div>
+  <div class="scroll-container" style="padding:20px">
+
+    <!-- STEP 0: Motivazione se non ha usato la tessera -->
+    <div id="fb-step0" class="fb-step hidden">
+      <div class="fb-step-title">Perché non hai usato la tessera?</div>
+      <div class="fb-step-sub">Aiutaci a migliorare il servizio</div>
+      <div style="display:flex;flex-direction:column;gap:8px;margin-top:16px" id="fb-skip-reasons">
+        <button class="fb-skip-reason-btn" data-reason="Colonnina non funzionante">🔌 Colonnina non funzionante</button>
+        <button class="fb-skip-reason-btn" data-reason="Tessera non riconosciuta">❌ Tessera non riconosciuta dalla colonnina</button>
+        <button class="fb-skip-reason-btn" data-reason="Ho usato un altro metodo di pagamento">💳 Ho usato un altro metodo di pagamento</button>
+        <button class="fb-skip-reason-btn" data-reason="Ho cambiato destinazione">🚗 Ho cambiato destinazione</button>
+        <button class="fb-skip-reason-btn" data-reason="Test / Prova">🧪 Era solo un test</button>
+        <button class="fb-skip-reason-btn" data-reason="Altro">✏️ Altro</button>
+      </div>
+      <div style="margin-top:14px">
+        <label style="font-size:11px;color:var(--text-muted);letter-spacing:0.5px;display:block;margin-bottom:6px">
+          DETTAGLI <span id="fb-skip-note-required" style="color:var(--error-red)">*</span>
+        </label>
+        <textarea id="fb-skip-note" rows="3"
+          placeholder="Descrivi cosa è successo... (obbligatorio)"
+          style="width:100%;padding:12px 14px;background:var(--bg-card);border:1px solid var(--tech-border-light);border-radius:12px;color:white;font-size:13px;resize:none;font-family:inherit"></textarea>
+        <div id="fb-skip-note-err" style="color:var(--error-red);font-size:12px;margin-top:4px;display:none">
+          ⚠️ Inserisci almeno una nota per procedere
+        </div>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:14px">
+        <button class="fb-btn-back" onclick="secureSession._fbBackToSlots()">← Indietro</button>
+        <button class="fb-btn-next" onclick="secureSession._fbSkipConfirm()">Conferma</button>
+      </div>
+    </div>
+
+    <!-- STEP 1: Quale slot hai usato? -->
+    <div id="fb-step1" class="fb-step">
+      <div class="fb-step-title">Hai usato una delle tessere caricate?</div>
+      <div class="fb-step-sub">Seleziona lo slot che hai avvicinato alla colonnina</div>
+      <div id="fb-slot-list" style="display:flex;flex-direction:column;gap:10px;margin-top:16px"></div>
+      <button class="fb-btn-skip" onclick="secureSession._fbShowSkipReason()">
+        Non ho usato nessuna tessera
+      </button>
+    </div>
+
+    <!-- STEP 2: Quale operatore? -->
+    <div id="fb-step2" class="fb-step hidden">
+      <div class="fb-step-title">Quale operatore hai attivato?</div>
+      <div class="fb-step-sub">Seleziona il gestore della colonnina che hai usato</div>
+      <div id="fb-op-list" style="display:flex;flex-direction:column;gap:8px;margin-top:16px"></div>
+      <div style="margin-top:12px">
+        <input id="fb-op-custom" type="text" placeholder="Altro operatore..." 
+          style="width:100%;padding:14px 16px;background:var(--bg-card);border:1px solid var(--tech-border-light);border-radius:12px;color:white;font-size:14px">
+      </div>
+      <div style="margin-top:12px">
+        <label style="font-size:11px;color:var(--text-muted);letter-spacing:0.5px;display:block;margin-bottom:6px">NOTE AGGIUNTIVE (facoltativo)</label>
+        <textarea id="fb-note-used" rows="2" placeholder="Es: colonnina rotta, ricarica lenta, problemi di segnale..."
+          style="width:100%;padding:12px 14px;background:var(--bg-card);border:1px solid var(--tech-border-light);border-radius:12px;color:white;font-size:13px;resize:none;font-family:inherit"></textarea>
+      </div>
+      <div style="display:flex;gap:10px;margin-top:14px">
+        <button class="fb-btn-back" onclick="secureSession._fbBack(1)">← Indietro</button>
+        <button class="fb-btn-next" onclick="secureSession._fbConfirmOp()">Avanti →</button>
+      </div>
+    </div>
+
+    <!-- STEP 3: Conferma e apri bot -->
+    <div id="fb-step3" class="fb-step hidden">
+      <div style="text-align:center;margin-bottom:20px">
+        <div style="font-size:56px;margin-bottom:12px">✅</div>
+        <div class="fb-step-title" style="text-align:center">Ottimo, grazie!</div>
+        <div class="fb-step-sub" style="text-align:center;margin-top:8px">
+          Hai usato: <strong id="fb-summary-slot" style="color:#FF9800"></strong><br>
+          Operatore: <strong id="fb-summary-op" style="color:#4CAF50"></strong>
+        </div>
+        <div id="fb-summary-note-wrap" style="display:none;margin-top:8px;background:rgba(255,255,255,0.05);border-radius:10px;padding:8px 12px">
+          <div style="font-size:11px;color:var(--text-muted)">Note:</div>
+          <div id="fb-summary-note" style="font-size:13px;color:rgba(255,255,255,0.8);margin-top:2px"></div>
+        </div>
+      </div>
+
+      <div style="background:rgba(41,182,246,0.08);border:1px solid rgba(41,182,246,0.25);border-radius:14px;padding:16px;margin-bottom:16px">
+        <div style="color:#29B6F6;font-size:13px;font-weight:700;margin-bottom:8px">📋 Hai terminato la ricarica?</div>
+        <div style="color:rgba(255,255,255,0.7);font-size:12px;line-height:1.6;margin-bottom:14px">
+          Ricordati di dichiarare il consumo nel bot Telegram. Premi il pulsante qui sotto per aprirlo direttamente.
+        </div>
+        <a id="fb-tg-link" href="https://t.me/Fox_Ev_bot" target="_blank"
+          style="display:flex;align-items:center;justify-content:center;gap:10px;background:#29B6F6;color:white;border-radius:12px;padding:14px;text-decoration:none;font-weight:700;font-size:14px">
+          ✈️ Apri Fox EV Bot su Telegram
+        </a>
+      </div>
+
+      <button class="btn-primary" onclick="secureSession._fbFinish()" style="margin-top:4px">
+        🏁 Torna alla Dashboard
+      </button>
+    </div>
+
+  </div>
+</div>
+
+<script src="app.js?v=75"></script>
 </body>
 </html>

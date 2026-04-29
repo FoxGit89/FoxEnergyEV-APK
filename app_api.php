@@ -374,6 +374,33 @@ try {
         exit;
     }
 
+    // ── OPERATORI PER SLOT (storico transazioni confermate) ──
+    if ($action === 'get_slot_operators') {
+        $slot_label = trim($_GET['slot_label'] ?? '');
+        $operators  = [];
+        if ($slot_label !== '') {
+            try {
+                $s = db()->prepare("
+                    SELECT DISTINCT t.operator_name, MAX(t.created_at) AS last_used
+                    FROM transactions t
+                    LEFT JOIN rfid_slots rs ON t.rfid_slot_id = rs.id
+                    WHERE t.user_id = ?
+                      AND rs.slot_label = ?
+                      AND t.status = 'CONFIRMED'
+                      AND t.operator_name IS NOT NULL
+                      AND t.operator_name != ''
+                    GROUP BY t.operator_name
+                    ORDER BY last_used DESC
+                    LIMIT 10
+                ");
+                $s->execute([$user['id'], $slot_label]);
+                $operators = $s->fetchAll(PDO::FETCH_ASSOC);
+            } catch(Exception $e) {}
+        }
+        echo json_encode(['operators' => $operators]);
+        exit;
+    }
+
     // ── BROADCASTS ──
     if ($action === 'get_broadcasts') {
         $msgs=[];
@@ -385,7 +412,98 @@ try {
         exit;
     }
 
+    // ── SAVE_SESSION_SURVEY ──
+    if ($action === 'save_session_survey') {
+        $session_id    = (int)($_GET['session_id']  ?? 0);
+        $slot_used     = trim($_GET['slot_used']    ?? '');
+        $operator_used = trim($_GET['operator']     ?? '');
+
+        if (!$session_id) {
+            echo json_encode(['error' => 'session_id mancante']);
+            exit;
+        }
+
+        // Verifica che la sessione appartenga all'utente corrente
+        try {
+            $check = db()->prepare("
+                SELECT id FROM chameleon_sessions
+                WHERE id = ? AND (user_id = ? OR telegram_id = ?)
+                LIMIT 1
+            ");
+            $check->execute([$session_id, $user['id'] ?? 0, $user['telegram_id'] ?? '']);
+            if (!$check->fetch()) {
+                echo json_encode(['error' => 'Sessione non trovata o non autorizzata']);
+                exit;
+            }
+
+            $upd = db()->prepare("
+                UPDATE chameleon_sessions
+                SET survey_slot_used    = ?,
+                    survey_operator     = ?,
+                    survey_completed_at = NOW()
+                WHERE id = ?
+            ");
+            $upd->execute([
+                $slot_used    ?: null,
+                $operator_used ?: null,
+                $session_id
+            ]);
+
+            echo json_encode(['success' => true, 'session_id' => $session_id]);
+        } catch(Exception $e) {
+            echo json_encode(['error' => 'Errore salvataggio survey: ' . $e->getMessage()]);
+        }
+        exit;
+    }
+
     // ── SESSIONE CHAMELEON ──
+    // ── SURVEY POST-SESSIONE ──
+    if ($action === 'save_session_survey') {
+        $session_id = (int)($_GET['session_id'] ?? 0);
+        $slot_used  = trim($_GET['slot_used']   ?? '');
+        $operator   = trim($_GET['operator']    ?? '');
+        $notes      = trim($_GET['notes']       ?? '');
+
+        if (!$session_id) {
+            echo json_encode(['error' => 'session_id mancante']);
+            exit;
+        }
+
+        try {
+            // Verifica che la sessione appartenga all'utente corrente
+            $chk = db()->prepare("
+                SELECT id FROM chameleon_sessions
+                WHERE id = ? AND (user_id = ? OR telegram_id = ?)
+                LIMIT 1
+            ");
+            $chk->execute([$session_id, $user['id'] ?? 0, $user['telegram_id'] ?? '']);
+            if (!$chk->fetch()) {
+                echo json_encode(['error' => 'Sessione non trovata']);
+                exit;
+            }
+
+            $upd = db()->prepare("
+                UPDATE chameleon_sessions
+                SET survey_slot_used    = ?,
+                    survey_operator     = ?,
+                    survey_notes        = ?,
+                    survey_completed_at = NOW()
+                WHERE id = ?
+            ");
+            $upd->execute([
+                $slot_used ?: null,
+                $operator  ?: null,
+                $notes     ?: null,
+                $session_id
+            ]);
+
+            echo json_encode(['success' => true]);
+        } catch(Exception $e) {
+            echo json_encode(['error' => $e->getMessage()]);
+        }
+        exit;
+    }
+
     if ($action === 'start_session' || $action === 'end_session') {
 
         // Crea tabella se non esiste
@@ -419,6 +537,37 @@ try {
                         ADD COLUMN geo_accuracy INT DEFAULT NULL AFTER longitude");
                 }
             } catch(Exception $e) {}
+
+            // Migrazione: aggiunge colonne survey post-sessione
+            try {
+                $cols = db()->query("SHOW COLUMNS FROM chameleon_sessions LIKE 'survey_slot_used'")->fetchAll();
+                if (empty($cols)) {
+                    db()->exec("ALTER TABLE chameleon_sessions
+                        ADD COLUMN survey_slot_used    VARCHAR(255) DEFAULT NULL AFTER geo_accuracy,
+                        ADD COLUMN survey_operator     VARCHAR(255) DEFAULT NULL AFTER survey_slot_used,
+                        ADD COLUMN survey_notes        TEXT         DEFAULT NULL AFTER survey_operator,
+                        ADD COLUMN survey_completed_at DATETIME    DEFAULT NULL AFTER survey_notes");
+                } else {
+                    // Aggiunge survey_notes se manca (upgrade da versione precedente)
+                    $hasNotes = db()->query("SHOW COLUMNS FROM chameleon_sessions LIKE 'survey_notes'")->fetchAll();
+                    if (empty($hasNotes)) {
+                        db()->exec("ALTER TABLE chameleon_sessions
+                            ADD COLUMN survey_notes TEXT DEFAULT NULL AFTER survey_operator");
+                    }
+                }
+            } catch(Exception $e) {}
+
+            // Migrazione: colonne survey post-sessione
+            try {
+                $has_survey = db()->query("SHOW COLUMNS FROM chameleon_sessions LIKE 'survey_slot_used'")->fetchAll();
+                if (empty($has_survey)) {
+                    db()->exec("ALTER TABLE chameleon_sessions
+                        ADD COLUMN survey_slot_used    VARCHAR(255) DEFAULT NULL AFTER geo_accuracy,
+                        ADD COLUMN survey_operator     VARCHAR(255) DEFAULT NULL AFTER survey_slot_used,
+                        ADD COLUMN survey_completed_at DATETIME     DEFAULT NULL AFTER survey_operator");
+                }
+            } catch(Exception $e) {}
+
         } catch(Exception $e) {}
 
         $ip = '';

@@ -153,8 +153,8 @@ const app = {
       this.renderDashboard();
       this.renderSlots();
       this.showScreen('dashboard-screen');
-      this._initMiniMap();
       this._initCarousel();
+      this._renderGestori();
     } catch(e) { console.error(e); alert(`Errore:\n${e.message||'Connessione fallita.'}`); this.logout(); }
   },
 
@@ -188,8 +188,7 @@ const app = {
     const list=document.getElementById('connect-slot-list');
     if (list) {
       list.innerHTML='';
-      const SLOTS = [1, 5, 8]; // slot fisici supportati V1/V2/V3/V4
-      for (const i of SLOTS) {
+      for (const i of [1,5,8]) {
         const card=this.mapping[i]; if(card)canSync=true;
         const div=document.createElement('div');
         div.className=`slot-card ${card?'active':''}`;
@@ -262,8 +261,6 @@ const app = {
     return String(s).replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
   },
 
-  // _bleLog → definito in bleEngine
-
 
   _opColor(name) {
     const PALS=[
@@ -308,11 +305,70 @@ const app = {
     return parts[0].slice(0,2).toUpperCase();
   },
 
-  // ── MAPPA COLONNINE OCM CON FUZZY MATCHING DAL BACKEND ──
-  async showMap() {
+  // ── GESTORI COMPATIBILI ──
+  _renderGestori() {
+    const section = document.getElementById('dash-gestori-section');
+    const track   = document.getElementById('dash-gestori-track');
+    const badge   = document.getElementById('dash-gestori-count');
+    if (!section || !track || !this.cards || !this.cards.length) return;
+
+    // Merge di tutti gli operatori da tutte le tessere, deduplicati
+    const opsMap = {}; // operator_name → {usage_count, cards:[]}
+    (this.cards||[]).forEach(card => {
+      (card.roaming_detail||[]).forEach(r => {
+        const key = r.operator_name;
+        if (!opsMap[key]) opsMap[key] = { usage_count:0, cards:[] };
+        opsMap[key].usage_count += parseInt(r.usage_count)||0;
+        if (!opsMap[key].cards.includes(card.slot_label))
+          opsMap[key].cards.push(card.slot_label);
+      });
+    });
+
+    // Ordina: usati prima (per utilizzi desc), poi nuovi
+    const ops = Object.entries(opsMap)
+      .map(([name,d]) => ({name, ...d}))
+      .sort((a,b) => b.usage_count - a.usage_count);
+
+    if (!ops.length) return;
+
+    badge.textContent = ops.length + (ops.length===1?' rete':' reti');
+    track.innerHTML = ops.map(op => {
+      const col   = this._opColor(op.name);
+      const ini   = this._opInitials(op.name);
+      const used  = op.usage_count > 0;
+      const avatarStyle = used
+        ? `background:${col.grad}`
+        : '';
+      return `<div class="dash-gestori-tile">
+        <div class="dash-gestori-avatar${used?'':' unused'}" style="${avatarStyle}">${this._esc(ini)}</div>
+        <div class="dash-gestori-name${used?'':' unused'}" title="${this._esc(op.name)}">${this._esc(op.name)}</div>
+        <div class="dash-gestori-uses${used?' used':' unused'}">${used ? op.usage_count+'×' : '0×'}</div>
+      </div>`;
+    }).join('');
+
+    section.classList.remove('hidden');
+  },
+
+  // ── MAPPA COLONNINE (rimossa — sostituita da carosello gestori) ──
+  showMap() { /* deprecata */ },
+
+  async _showMapOld() {
     app.showScreen('map-screen');
-    const mapLoading = document.getElementById('map-loading');
-    
+    document.getElementById('map-loading').style.display = 'flex';
+    document.getElementById('map-loading-text').textContent = 'Rilevamento posizione...';
+
+    // Raccogli tutti gli operator_name dalle tessere dell'utente
+    const userOps = [];
+    const cardToOps = {}; // operatore → lista tessere
+    (this.cards || []).forEach(card => {
+      (card.roaming_detail || []).forEach(r => {
+        const op = r.operator_name.toLowerCase();
+        userOps.push(op);
+        if (!cardToOps[op]) cardToOps[op] = [];
+        cardToOps[op].push(card.slot_label);
+      });
+    });
+
     // Inizializza mappa Leaflet (una sola volta)
     if (!this._map) {
       this._map = L.map('leaflet-map', { zoomControl: true });
@@ -320,50 +376,11 @@ const app = {
         attribution: '© OpenStreetMap',
         maxZoom: 18,
       }).addTo(this._map);
-
-      // Aggiungi listener per caricamento colonnine allo spostamento/zoom
-      this._map.on('moveend', () => {
-        // Se non abbiamo ancora fatto il fix iniziale, ignoriamo
-        if (!this._initialFixDone) return;
-        
-        // Debounce per evitare troppe chiamate API
-        clearTimeout(this._mapMoveTimeout);
-        this._mapMoveTimeout = setTimeout(() => {
-           this._fetchStationsForMap();
-        }, 500);
-      });
     }
-    
-    // Inizializza Mini-Mappa Dashboard
-    if (!this._miniMap) {
-      this._miniMap = L.map('dash-mini-map', { zoomControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false });
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '',
-        maxZoom: 18,
-      }).addTo(this._miniMap);
-    }
-    
-    setTimeout(() => this._map.invalidateSize(), 100);
 
-    // Eseguiamo il fix GPS la prima volta, o se richiesto
-    if (!this._initialFixDone) {
-      this.centerMapOnUser();
-    }
-  },
-
-  centerMapOnUser() {
-    const mapLoading = document.getElementById('map-loading');
-    const mapLoadingText = document.getElementById('map-loading-text');
-    mapLoading.style.display = 'flex';
-    mapLoadingText.textContent = 'Rilevamento posizione...';
-
+    // Ottieni posizione utente
     if (!navigator.geolocation) {
-      mapLoadingText.textContent = 'GPS non disponibile';
-      setTimeout(() => { mapLoading.style.display = 'none'; }, 2000);
-      // Se non abbiamo GPS, usiamo una posizione di default per permettere l'uso
-      this._initialFixDone = true;
-      this._map.setView([41.9028, 12.4964], 14); // Roma
-      this._fetchStationsForMap();
+      document.getElementById('map-loading-text').textContent = 'GPS non disponibile';
       return;
     }
 
@@ -371,152 +388,276 @@ const app = {
       const lat = pos.coords.latitude;
       const lng = pos.coords.longitude;
 
-      this._initialFixDone = true;
-      // Centra mappa principale sull'utente
+      // Centra mappa sull'utente
       this._map.setView([lat, lng], 14);
-      // Aggiorna anche mini mappa
-      this._miniMap.setView([lat, lng], 14);
 
+      // Marker posizione utente
       if (this._userMarker) this._userMarker.remove();
       this._userMarker = L.circleMarker([lat, lng], {
         radius: 10, fillColor: '#FF9800', color: '#fff',
         weight: 3, opacity: 1, fillOpacity: 1,
       }).addTo(this._map).bindPopup('📍 Sei qui');
-      
-      if (this._miniUserMarker) this._miniUserMarker.remove();
-      this._miniUserMarker = L.circleMarker([lat, lng], {
-        radius: 8, fillColor: '#FF9800', color: '#fff',
-        weight: 2, opacity: 1, fillOpacity: 1,
-      }).addTo(this._miniMap);
-      
-      mapLoading.style.display = 'none';
-      this._fetchStationsForMap();
+
+      document.getElementById('map-loading-text').textContent = 'Caricamento colonnine...';
+
+      // Chiama Overpass API (OpenStreetMap) — gratuita, nessuna key, CORS ok
+      try {
+        // Raggio 5km attorno alla posizione
+        const radius = 5000;
+        // Query Overpass: sintassi corretta per nodi e way con tutti i tag
+        // 'out body' = tutti i tag, 'center' = coordinate centroide per way, limit dopo
+        const query = `[out:json][timeout:20];
+          (
+            node["amenity"="charging_station"](around:${radius},${lat},${lng});
+            way["amenity"="charging_station"](around:${radius},${lat},${lng});
+          );
+          out body center 50;`;
+        const resp = await fetch('https://overpass-api.de/api/interpreter', {
+          method: 'POST',
+          body: query,
+          headers: { 'Content-Type': 'text/plain' },
+        });
+        const data = await resp.json();
+
+        // Normalizza in formato simile a OCM
+        const pois = data.elements.map(el => ({
+          id:       el.id,
+          lat:      el.lat || el.center?.lat,
+          lng:      el.lon || el.center?.lon,
+          name:     el.tags?.name || el.tags?.operator || el.tags?.brand || 'Colonnina',
+          operator: el.tags?.operator || el.tags?.['operator:it'] || '',
+          brand:    el.tags?.brand || '',
+          network:  el.tags?.network || el.tags?.['network:it'] || '',
+          operator_wikidata: el.tags?.['operator:wikidata'] || '',
+          // Concatena tutti i valori dei tag per un matching più ampio
+          allTags:  Object.values(el.tags || {}).join(' '),
+          socket:   [
+            el.tags?.['socket:type2']   ? 'Type2' : '',
+            el.tags?.['socket:ccs2']    ? 'CCS' : '',
+            el.tags?.['socket:chademo'] ? 'CHAdeMO' : '',
+            el.tags?.['socket:tesla_supercharger'] ? 'Tesla' : '',
+          ].filter(Boolean).join(', '),
+          capacity: el.tags?.capacity || '',
+        })).filter(p => p.lat && p.lng);
+
+        // Rimuovi marker colonnine precedenti
+        if (this._stationMarkers) this._stationMarkers.forEach(m => m.remove());
+        this._stationMarkers = [];
+
+        // Dizionario di normalizzazione: varianti utente → keywords OSM
+        // OSM usa operator=, brand=, network=, name= in modo inconsistente
+        // Includiamo tutte le varianti documentate + wikidata IDs comuni
+        const OP_NORM = {
+          // Enel X / JuicePass
+          'enelx':        ['enel x','enel','juicepass','e-distribuzione','endesa'],
+          'enel x':       ['enel x','enel','juicepass'],
+          'enel x / ewiva':['enel','ewiva'],
+          // Plenitude / Be Charge / ENI
+          'plenitude':    ['plenitude','be charge','becharge','be_charge','be power','bepower','be-charge','eni gas','eni plenitude','plenitude on the road'],
+          // Free To X / Autostrade
+          'f2x':        ['free to x','free2x','f2x','freetox','autostrade'],
+          'f2x':        ['free to x','free2x','f2x','freetox'],
+          'free2x':       ['free to x','free2x','f2x'],
+          'free to x':    ['free to x','free2x','f2x'],
+          'freetox':      ['free to x','free2x','f2x'],
+          // Atlante / Nhoa
+          'atlante':      ['atlante','nhoa'],
+          // Electra
+          'electra':      ['electra'],
+          'electriese':   ['electra'],
+          'alectriase':   ['electra'],
+          'electriase':   ['electra'],
+          'electra france':['electra'],
+          // Duferco
+          'duferco':      ['duferco','duferco energia'],
+          // A2A
+          'a2a':        ['a2a','a2a energia','a2a smart city'],
+          // Ionity
+          'ionity':       ['ionity'],
+          // Ewiva / Volkswagen
+          'ewiva':        ['ewiva','volkswagen','vw'],
+          // Acea
+          'acea':         ['acea'],
+          // Allego
+          'allego':       ['allego','nuon'],
+          // Ayvens / Arval
+          'ayvens':       ['ayvens','arval','leaseplan'],
+          // GES
+          'ges':        ['ges','gestione energie'],
+          // IP Planet
+          'iplanet':      ['ip planet','iplanet','ip charge','italiana petroli'],
+          'ip planet':    ['ip planet','iplanet'],
+          'ip':         ['ip planet','iplanet','ip charge'],
+          'ipplanet':     ['ip planet','iplanet'],
+          // Powy
+          'powy':         ['powy'],
+          // Electrip
+          'electrip':     ['electrip'],
+          // Neogy
+          'neogy':        ['neogy'],
+          // Ecotap
+          'ecotap':       ['ecotap'],
+          'eco tap':      ['ecotap'],
+          // Q8 / Electra
+          'q8 electra':   ['q8','electra','kuwait petroleum'],
+          // Volvo
+          'volvo':        ['volvo'],
+          // Energetix
+          'energetix':    ['energetix'],
+          // Edison
+          'edison':       ['edison'],
+          // Alperia
+          'alperia':      ['alperia'],
+          // Nucleo
+          'nucleo':       ['nucleo'],
+          // Evway
+          'evway':        ['evway'],
+          // Emobitaly
+          'emobitaly':    ['emobi','emobitaly'],
+          // Estra
+          'estra':        ['estra'],
+          // E.ON
+          'eon':        ['e.on','eon'],
+          // TotalEnergies
+          'total':        ['totalenergies','total energies','total'],
+          // Go Electric
+          'go electric station':['go electric'],
+          // ChargePoint
+          'charge poin +':['chargepoint','charge point'],
+          // Jet Strom (e nuovi operatori zona Italia)
+          // Repower (zona Milano)
+          'repower':      ['repower','recharge around','dinaclub'],
+          // Fastway
+          'fastway':      ['fastway'],
+          // Nextcharge
+          'nextcharge':   ['nextcharge'],
+          // E-Moving
+          'e-moving':     ['e-moving','emoving'],
+          'jet strom':    ['jet strom','jetstrom'],
+          // Electrip
+          'electrip':     ['electrip','elec trip'],
+          // Powy
+          'powy':         ['powy'],
+          // Ewiva / Volkswagen Group Charging
+          'ewiva':        ['ewiva','volkswagen','vw','volkswagen group charging','elli'],
+          // Atlante / Nhoa Energy
+          'atlante':      ['atlante','nhoa','free electrons'],
+          // Electra (Italia e Francia)
+          'electra':      ['electra'],
+          'electriese':   ['electra'],
+          'alectriase':   ['electra'],
+          'electra france':['electra'],
+          // Ionity
+          'ionity':       ['ionity'],
+          // Tesla Supercharger
+          'tesla':        ['tesla'],
+          'volvo':        ['tesla','volvo'],
+          // Fastned
+          'fastned':      ['fastned'],
+          // Enel X Way (nuovo brand Enel X)
+          'enel x way':   ['enel x way','enel x','enel','juicepass'],
+          // Duferco
+          'duferco':      ['duferco','duferco energia'],
+          };
+
+        // Normalizza: ogni operatore utente → lista di keywords OSM da cercare
+        const userKeywords = []; // [{keywords:[...], cards:[...]}]
+        userOps.forEach(op => {
+          const norm = OP_NORM[op.toLowerCase()] || [op.toLowerCase()]; // chiave lowercase
+          const existing = userKeywords.find(u => u.keywords.join() === norm.join());
+          if (existing) {
+            (cardToOps[op]||[]).forEach(c => { if(!existing.cards.includes(c)) existing.cards.push(c); });
+          } else {
+            userKeywords.push({ keywords: norm, cards: [...(cardToOps[op]||[])] });
+          }
+        });
+
+
+        pois.forEach(poi => {
+          const pLat = poi.lat;
+          const pLng = poi.lng;
+          if (!pLat || !pLng) return;
+
+          // Combina tutti i campi OSM rilevanti per il matching
+          const opTitle = [
+            poi.operator, poi.brand, poi.network, poi.name,
+            poi.operator_wikidata, poi.allTags
+          ].filter(Boolean).join(' ').toLowerCase();
+          const address = poi.name || poi.operator || '';
+          const town    = '';
+          const conns   = poi.socket ? poi.socket.replace('yes','').trim() : '';
+
+          // Matching: cerca se una keyword è contenuta nel titolo OSM (case-insensitive)
+          const matchedCards = [];
+          userKeywords.forEach(({keywords, cards}) => {
+            if (keywords.some(kw => opTitle.includes(kw))) {
+              cards.forEach(c => { if(!matchedCards.includes(c)) matchedCards.push(c); });
+            }
+          });
+
+          const hasMatch = matchedCards.length > 0;
+          const color    = hasMatch ? '#4CAF50' : '#9E9E9E';
+          const icon     = hasMatch ? '⚡' : '🔌';
+
+          const marker = L.circleMarker([pLat, pLng], {
+            radius: hasMatch ? 10 : 7,
+            fillColor: color, color: '#fff',
+            weight: 2, opacity: 1, fillOpacity: 0.9,
+          }).addTo(this._map);
+
+          let popupHtml = `<div style="min-width:180px;font-family:sans-serif">`;
+          popupHtml += `<b style="font-size:13px">${icon} ${this._esc(address)}</b>`;
+          if (town) popupHtml += `<div style="color:#666;font-size:11px">${this._esc(town)}</div>`;
+          const opDisplay = poi.operator || poi.brand || '';
+          if (opDisplay) popupHtml += `<div style="margin-top:4px;font-size:12px">🏢 ${this._esc(opDisplay)}</div>`;
+          if (poi.capacity) popupHtml += `<div style="font-size:11px;color:#888">🔌 ${this._esc(poi.capacity)} punti</div>`;
+          if (conns) popupHtml += `<div style="font-size:11px;color:#555">🔌 ${this._esc(conns)}</div>`;
+          if (hasMatch) {
+            popupHtml += `<div style="margin-top:8px;padding:6px 8px;background:#E8F5E9;border-radius:6px;font-size:12px">`;
+            popupHtml += `<b style="color:#2E7D32">✅ Usa queste tessere:</b><br>`;
+            matchedCards.forEach(c => { popupHtml += `• ${this._esc(c)}<br>`; });
+            popupHtml += `</div>`;
+          } else {
+            popupHtml += `<div style="margin-top:6px;font-size:11px;color:#999">Operatore non verificato nelle tue tessere</div>`;
+          }
+          popupHtml += `</div>`;
+
+          marker.bindPopup(popupHtml);
+          this._stationMarkers.push(marker);
+        });
+
+        document.getElementById('map-loading').style.display = 'none';
+        setTimeout(() => this._map.invalidateSize(), 100);
+
+        // Pannello debug: mostra tag raw delle colonnine trovate
+        const debugPanel = document.getElementById('map-debug-panel');
+        if (debugPanel) {
+          const matched = pois.filter(p => {
+            const t = [p.operator,p.brand,p.network,p.name,p.allTags].filter(Boolean).join(' ').toLowerCase();
+            return userKeywords.some(({keywords}) => keywords.some(kw => t.includes(kw)));
+          }).length;
+
+          // Lista operatori unici trovati da OSM (operator + brand + name)
+          const rawOps = [...new Set(
+            pois.map(p => [p.operator, p.brand, p.network].filter(Boolean).join(' / ')).filter(Boolean)
+          )].slice(0,20);
+
+          const noTagCount = pois.filter(p => !p.operator && !p.brand && !p.network && !p.name).length;
+
+          debugPanel.innerHTML =
+            `<b>🔍 OSM:</b> ${pois.length} colonnine · <b style="color:#4CAF50">${matched} con tessera</b> · ${noTagCount} senza tag<br>` +
+            `<b>Operatori trovati:</b> ${rawOps.length ? rawOps.join(' | ') : '<i>nessun operator/brand tag in OSM</i>'}`;
+          debugPanel.style.display = 'block';
+        }
+
+      } catch(e) {
+        document.getElementById('map-loading-text').textContent = 'Errore caricamento colonnine';
+        console.error('[MAP]', e);
+      }
 
     }, (err) => {
-      let errorText = 'Errore GPS';
-      switch(err.code) {
-        case err.PERMISSION_DENIED:
-          errorText = 'Permesso GPS negato';
-          break;
-        case err.POSITION_UNAVAILABLE:
-          errorText = 'Posizione non disponibile';
-          break;
-        case err.TIMEOUT:
-          errorText = 'Timeout GPS. Riprova.';
-          break;
-      }
-      document.getElementById('map-loading-text').textContent = errorText;
-      setTimeout(() => { document.getElementById('map-loading').style.display = 'none'; }, 2000);
-      
-      // Fallback
-      if(!this._initialFixDone) {
-        this._initialFixDone = true;
-        this._map.setView([41.9028, 12.4964], 14);
-        this._fetchStationsForMap();
-      }
+      document.getElementById('map-loading-text').textContent = 'Permesso GPS negato';
     }, { timeout: 10000, enableHighAccuracy: false });
-  },
-
-  async _fetchStationsForMap() {
-    if (!this._map) return;
-    
-    // Calcoliamo il centro e il raggio approssimativo in base ai bounds visibili
-    const center = this._map.getCenter();
-    const bounds = this._map.getBounds();
-    // Distanza in km dal centro all'angolo nord-est (approssimazione del raggio visibile)
-    const radiusMeters = center.distanceTo(bounds.getNorthEast());
-    // Convertiamo in km, con un minimo di 1km e massimo di 50km
-    let radiusKm = Math.min(Math.max(radiusMeters / 1000, 1), 50);
-
-    try {
-      // Potremmo mostrare uno spinner leggero qui se vogliamo
-      const resp = await this.apiCall({
-        action: 'get_map_pois',
-        lat: center.lat,
-        lng: center.lng,
-        radius: radiusKm,
-        user_id: this.user.telegramId
-      });
-
-      if (resp.error) throw new Error(resp.error);
-
-      // Rimuovi marker colonnine precedenti
-      if (this._stationMarkers) this._stationMarkers.forEach(m => m.remove());
-      this._stationMarkers = [];
-      
-      if (this._miniStationMarkers) this._miniStationMarkers.forEach(m => m.remove());
-      this._miniStationMarkers = [];
-
-      (resp.pois || []).forEach(poi => {
-        const color = poi.is_supported ? '#4CAF50' : '#9E9E9E';
-        const icon  = poi.is_supported ? '⚡' : '🔌';
-
-        // Marker per mappa principale
-        const marker = L.circleMarker([poi.lat, poi.lng], {
-          radius: poi.is_supported ? 10 : 7,
-          fillColor: color, color: '#fff',
-          weight: 2, opacity: 1, fillOpacity: 0.9,
-        }).addTo(this._map);
-
-        // Marker per mini mappa
-        const miniMarker = L.circleMarker([poi.lat, poi.lng], {
-          radius: poi.is_supported ? 5 : 3,
-          fillColor: color, color: 'transparent',
-          weight: 0, opacity: 1, fillOpacity: 0.6,
-        }).addTo(this._miniMap);
-
-        let popupHtml = `<div style="min-width:180px;font-family:sans-serif">`;
-        popupHtml += `<b style="font-size:13px">${icon} ${this._esc(poi.title)}</b>`;
-        const opDisplay = poi.operator || '';
-        if (opDisplay) {
-            popupHtml += `<div style="margin-top:4px;font-size:12px;font-weight:600;color:#FF9800;">${this._esc(opDisplay)}</div>`;
-        }
-        
-        const connDisplay = poi.connections_info || 'Info prese non disponibili';
-        popupHtml += `<div style="margin-top:4px;font-size:12px;color:#ccc;">🔌 ${this._esc(connDisplay)}</div>`;
-        
-        if (poi.is_supported) {
-          popupHtml += `<div style="margin-top:8px;padding:6px 8px;background:rgba(76, 175, 80, 0.15);border: 1px solid rgba(76, 175, 80, 0.3);border-radius:6px;font-size:12px;color:#000;">`;
-          popupHtml += `<b style="color:#4CAF50">✅ Usa queste tessere:</b><br>`;
-          (poi.matched_slots || []).forEach(c => { popupHtml += `• ${this._esc(c)}<br>`; });
-          popupHtml += `</div>`;
-        } else {
-          popupHtml += `<div style="margin-top:6px;font-size:11px;color:#999">Operatore non verificato nelle tue tessere</div>`;
-        }
-        popupHtml += `</div>`;
-
-        marker.bindPopup(popupHtml);
-        this._stationMarkers.push(marker);
-        this._miniStationMarkers.push(miniMarker);
-      });
-      
-    } catch(e) {
-      console.error('[MAP FETCH]', e);
-    }
-  },
-
-  // ── MINI MAPPA DASHBOARD ──
-  _initMiniMap() {
-    if (!this._miniMap) {
-      this._miniMap = L.map('dash-mini-map', { zoomControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false });
-      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
-        attribution: '',
-        maxZoom: 18,
-      }).addTo(this._miniMap);
-    }
-    
-    // Centra temporaneamente su Roma e usa IP geolocation se disponibile, per evitare richieste GPS premature.
-    this._miniMap.setView([41.9028, 12.4964], 6);
-    fetch('https://get.geojs.io/v1/ip/geo.json')
-      .then(r => r.json())
-      .then(geo => {
-        if (geo && geo.latitude && geo.longitude) {
-          this._miniMap.setView([parseFloat(geo.latitude), parseFloat(geo.longitude)], 12);
-        }
-      }).catch(e => console.log('IP geoloc failed', e));
-    
-    // Invalida size in caso fosse nascosta durante l'init
-    setTimeout(() => this._miniMap.invalidateSize(), 100);
   },
 
   // ── CAROSELLO ──
@@ -859,7 +1000,7 @@ function detectCardProfile(res) {
 // SESSIONE SICURA — timer 60s, cancellazione automatica
 // ============================================================
 const secureSession = {
-  _timer: null, _startedAt: null, _slotLabels: [], _wiping: false,
+  _timer: null, _startedAt: null, _slotLabels: [], _wiping: false, _sessionId: null,
 
   start(slotLabels) {
     this._slotLabels = slotLabels;
@@ -1002,6 +1143,232 @@ const secureSession = {
   },
 
   // Invia end_session con sendBeacon (funziona anche se browser viene killato)
+  // ============================================================
+  // FEEDBACK POST-SESSIONE
+  // ============================================================
+
+  _fbSelectedSlot: null,
+  _fbSelectedOp:   null,
+
+  _showFeedback() {
+    // Prepara step 1: lista slot usati in sessione
+    const slotList = document.getElementById('fb-slot-list');
+    slotList.innerHTML = '';
+
+    // Slot caricati durante questa sessione
+    const labels = this._slotLabels || [];
+    if (!labels.length) {
+      // Nessuno slot caricato — salta al finish
+      this._fbFinish();
+      return;
+    }
+
+    labels.forEach(label => {
+      // Trova la card corrispondente per i roaming
+      const card = (app.cards||[]).find(c => c.slot_label === label);
+      const ops  = (card?.roaming_detail||[])
+        .filter(r => (parseInt(r.usage_count)||0) > 0)
+        .map(r => r.operator_name).join(', ');
+
+      const slotNum = card?.id || '?';
+      const btn = document.createElement('button');
+      btn.className = 'fb-slot-btn';
+      btn.innerHTML = `
+        <div class="fb-slot-num">${slotNum}</div>
+        <div class="fb-slot-info">
+          <div class="fb-slot-label">${app._esc(label)}</div>
+          ${ops ? `<div class="fb-slot-ops">Usato con: ${app._esc(ops)}</div>` : ''}
+        </div>
+        <span style="color:var(--text-muted);font-size:20px">›</span>`;
+      btn.onclick = () => this._fbSelectSlot(card, label, btn);
+      slotList.appendChild(btn);
+    });
+
+    // Reset step
+    this._fbSelectedSlot = null;
+    this._fbSelectedOp   = null;
+    document.getElementById('fb-step1').classList.remove('hidden');
+    document.getElementById('fb-step2').classList.add('hidden');
+    document.getElementById('fb-step3').classList.add('hidden');
+    app.showScreen('feedback-screen');
+  },
+
+  _fbSelectSlot(card, label, btn) {
+    // Evidenzia slot selezionato
+    document.querySelectorAll('.fb-slot-btn').forEach(b => b.classList.remove('selected'));
+    btn.classList.add('selected');
+    this._fbSelectedSlot = { card, label };
+
+    // Piccola vibrazione di conferma
+    if(navigator.vibrate) navigator.vibrate(30);
+
+    // Passa allo step 2 dopo 200ms
+    setTimeout(() => {
+      document.getElementById('fb-step1').classList.add('hidden');
+      this._buildOpList(card);
+      document.getElementById('fb-step2').classList.remove('hidden');
+    }, 200);
+  },
+
+  _buildOpList(card) {
+    const opList = document.getElementById('fb-op-list');
+    opList.innerHTML = '';
+    document.getElementById('fb-op-custom').value = '';
+
+    // Operatori precedenti di questo slot, ordinati per utilizzi desc
+    const ops = (card?.roaming_detail||[])
+      .sort((a,b) => (parseInt(b.usage_count)||0) - (parseInt(a.usage_count)||0));
+
+    if (!ops.length) {
+      opList.innerHTML = '<div style="color:var(--text-muted);font-size:13px;padding:8px 0">Nessun operatore precedente — usa il campo sotto</div>';
+      return;
+    }
+
+    ops.forEach(r => {
+      const col = app._opColor(r.operator_name);
+      const ini = app._opInitials(r.operator_name);
+      const cnt = parseInt(r.usage_count)||0;
+      const btn = document.createElement('button');
+      btn.className = 'fb-op-btn';
+      btn.innerHTML = `
+        <div class="fb-op-avatar" style="background:${col.grad}">${app._esc(ini)}</div>
+        <div class="fb-op-info">
+          <div class="fb-op-name">${app._esc(r.operator_name)}</div>
+          ${cnt ? `<div class="fb-op-count">✓ usato ${cnt} volta${cnt>1?'e':''}</div>` : ''}
+        </div>
+        <span style="color:var(--text-muted);font-size:20px">›</span>`;
+      btn.onclick = () => {
+        document.querySelectorAll('.fb-op-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        this._fbSelectedOp = r.operator_name;
+        document.getElementById('fb-op-custom').value = '';
+        if(navigator.vibrate) navigator.vibrate(30);
+      };
+      opList.appendChild(btn);
+    });
+  },
+
+  _fbBack(toStep) {
+    document.getElementById(`fb-step${toStep}`).classList.remove('hidden');
+    document.getElementById(`fb-step${toStep+1}`).classList.add('hidden');
+    if (toStep === 1) {
+      this._fbSelectedSlot = null;
+      this._fbSelectedOp   = null;
+    }
+  },
+
+  _fbConfirmOp() {
+    const custom = document.getElementById('fb-op-custom').value.trim();
+    if (custom) this._fbSelectedOp = custom;
+
+    if (!this._fbSelectedOp) {
+      document.getElementById('fb-op-custom').style.borderColor = 'var(--error-red)';
+      document.getElementById('fb-op-custom').placeholder = 'Seleziona o scrivi un operatore...';
+      return;
+    }
+    document.getElementById('fb-op-custom').style.borderColor = '';
+
+    // Mostra riepilogo step 3
+    document.getElementById('fb-summary-slot').textContent = this._fbSelectedSlot?.label || '';
+    document.getElementById('fb-summary-op').textContent   = this._fbSelectedOp || '';
+
+    // Link Telegram con parametri start per pre-compilare la dichiarazione
+    const slotLabel = encodeURIComponent(this._fbSelectedSlot?.label || '');
+    const opLabel   = encodeURIComponent(this._fbSelectedOp || '');
+    document.getElementById('fb-tg-link').href =
+      `https://t.me/Fox_Ev_bot?start=consumo_${slotLabel}_${opLabel}`;
+
+    const notes = (document.getElementById('fb-note-used')?.value || '').trim();
+
+    // Salva dati survey in chameleon_sessions
+    if (this._sessionId) {
+      app.apiCall({
+        action:     'save_session_survey',
+        user_id:    app.user.telegramId,
+        session_id: this._sessionId,
+        slot_used:  this._fbSelectedSlot?.label || '',
+        operator:   this._fbSelectedOp || '',
+        notes:      notes,
+      }).catch(()=>{});
+    }
+
+    // Mostra note nel riepilogo se presenti
+    const noteWrap = document.getElementById('fb-summary-note-wrap');
+    const noteEl   = document.getElementById('fb-summary-note');
+    if (notes && noteWrap && noteEl) {
+      noteEl.textContent = notes;
+      noteWrap.style.display = 'block';
+    } else if (noteWrap) {
+      noteWrap.style.display = 'none';
+    }
+
+    document.getElementById('fb-step2').classList.add('hidden');
+    document.getElementById('fb-step3').classList.remove('hidden');
+  },
+
+  _fbShowSkipReason() {
+    // Mostra step 0: motivazione skip
+    document.getElementById('fb-step1').classList.add('hidden');
+    document.getElementById('fb-step0').classList.remove('hidden');
+    // Reset selezione
+    document.querySelectorAll('.fb-skip-reason-btn').forEach(b => b.classList.remove('selected'));
+    document.getElementById('fb-skip-note').value = '';
+    document.getElementById('fb-skip-note-err').style.display = 'none';
+    // Imposta handler sui pulsanti motivazione
+    document.querySelectorAll('.fb-skip-reason-btn').forEach(btn => {
+      btn.onclick = () => {
+        document.querySelectorAll('.fb-skip-reason-btn').forEach(b => b.classList.remove('selected'));
+        btn.classList.add('selected');
+        if(navigator.vibrate) navigator.vibrate(30);
+        // Se "Altro" è selezionato la textarea è già visibile — focus
+        if (btn.dataset.reason === 'Altro') {
+          document.getElementById('fb-skip-note').focus();
+        } else {
+          // Pre-compila la textarea con il motivo
+          document.getElementById('fb-skip-note').value = btn.dataset.reason;
+        }
+      };
+    });
+  },
+
+  _fbBackToSlots() {
+    document.getElementById('fb-step0').classList.add('hidden');
+    document.getElementById('fb-step1').classList.remove('hidden');
+  },
+
+  _fbSkipConfirm() {
+    const note = document.getElementById('fb-skip-note').value.trim();
+    if (!note) {
+      document.getElementById('fb-skip-note-err').style.display = 'block';
+      document.getElementById('fb-skip-note').style.borderColor = 'var(--error-red)';
+      return;
+    }
+    document.getElementById('fb-skip-note-err').style.display = 'none';
+    document.getElementById('fb-skip-note').style.borderColor = '';
+
+    // Salva survey con slot_used vuoto ma nota obbligatoria
+    if (this._sessionId) {
+      app.apiCall({
+        action:     'save_session_survey',
+        user_id:    app.user.telegramId,
+        session_id: this._sessionId,
+        slot_used:  '',
+        operator:   '',
+        notes:      note,
+      }).catch(()=>{});
+    }
+
+    // Torna alla dashboard senza aprire Telegram
+    this._slotLabels = [];
+    app.showScreen('dashboard-screen');
+  },
+
+  _fbFinish() {
+    this._slotLabels = [];
+    app.showScreen('dashboard-screen');
+  },
+
+  // ============================================================
   _sendEndSession(reason) {
     const uid = app.user?.telegramId;
     if (!uid) return;
@@ -1040,40 +1407,47 @@ const secureSession = {
       await bleEngine.wipeAllSlots(setWipe);
       if(navigator.vibrate)navigator.vibrate([100,50,200]);
       this._sendEndSession(reason);
-      setWipe('🦊✅','DISPOSITIVO PULITO','Tutti gli slot sono stati cancellati. Arrivederci!');
-      setTimeout(()=>{this._wiping=false;app.showScreen('dashboard-screen');},2000);
+      setWipe('🦊✅','DISPOSITIVO PULITO','Tutti gli slot sono stati cancellati.');
+      // Mostra schermata feedback dopo 1.2s
+      setTimeout(()=>{
+        this._wiping=false;
+        this._showFeedback();
+      }, 1200);
     } catch(err) {
-      console.error('[WIPE ERROR]',err);
-      // BLE perso: notifica admin e logout sicuro
-      secureSession._sendEndSession('ble_lost');
+      bleEngine._bleLog('ERRORE WIPE: ' + (err.message||String(err)), true);
+      console.error('[WIPE ERROR]', err);
+      this._sendEndSession('ble_lost');
       app.apiCall({
         action: 'notify_admin',
         user_id: app.user.telegramId,
         event: 'ble_disconnected_during_session',
-        slots: this._slotLabels.join(','),
+        slots: (this._slotLabels||[]).join(','),
         error: (err.message||'').substring(0,100),
       }).catch(()=>{});
-      setWipe('🔒','SESSIONE INTERROTTA','Connessione persa durante la sessione attiva.\n\nGli amministratori sono stati avvisati.\nVerrai disconnesso tra pochi secondi.');
+      setWipe('⚠️','PULIZIA INCOMPLETA',
+        'Connessione persa durante la cancellazione.\n' +
+        'Riavvia il Chameleon per sicurezza.\n\n' +
+        'Gli amministratori sono stati avvisati.');
       this._startedAt=null; this._slotLabels=[]; this._wiping=false;
-      setTimeout(()=>app.logout(),4000);
+      setTimeout(()=>{ app.showScreen('dashboard-screen'); }, 4000);
     }
   },
 };
 
 // ============================================================
-// BLE ENGINE — UNIVERSALE (Compatibile con V1, V2.0 e V3.0)
+// BLE ENGINE — UNICA CONNESSIONE PER TUTTA LA SESSIONE
+// Flusso: connect → leggi slot → scrivi → usa tessere → wipe → disconnect
 // ============================================================
 window.bleEngine = {
   ultra: null,
 
   _bleLog(msg, isError=false) {
     const ts = new Date().toLocaleTimeString('it-IT');
-    const line = `[${ts}] ${msg}`;
     console.log('[BLE]', msg);
     const panel = document.getElementById('ble-debug-panel');
     const log   = document.getElementById('ble-debug-log');
     if (!panel || !log) return;
-    log.textContent += line + '\n';
+    log.textContent += `[${ts}] ${msg}\n`;
     log.scrollTop = log.scrollHeight;
     if (isError) panel.classList.remove('hidden');
   },
@@ -1099,30 +1473,30 @@ window.bleEngine = {
     else document.getElementById('sync-back-btn').classList.add('hidden');
   },
 
-  // ── PASSO 1: Connetti e pulisci ──
+  // ── PASSO 1: Connetti → cancella subito → mostra selezione slot ──
   async connectAndRead(telegramId) {
-    this.setConnectStatus('📶','CONNESSIONE IN CORSO','Seleziona il dispositivo nel popup e premi Accoppia...');
+    this.setConnectStatus('📶','CONNESSIONE IN CORSO','Seleziona il Chameleon Ultra nel popup Bluetooth...');
     try {
       const { ChameleonUltra, TagType, FreqType, DeviceMode } = window.ChameleonUltraJS;
-      
+
+      // Connessione — pattern identico v10
       if (this.ultra) { try{await this.ultra.disconnect();}catch(e){} this.ultra=null; }
-      
+      // Timeout 30s per operazioni BLE intensive (default 5s è troppo poco per 8 slot 4K)
       this.ultra = new ChameleonUltra();
       await this.ultra.use(new window.ChameleonUltraJS.WebbleAdapter());
       await this.ultra.connect();
-      
-      this.hwVersion = 1; // workaround universale — sicuro su tutti i modelli SE/SE2/SE3
-      await new Promise(r=>setTimeout(r,300)); // stabilizza BLE post-connect
 
-      this.setConnectStatus('🔍','LETTURA IN CORSO','Chameleon connesso, lettura slot...');
+      // 1. Leggi snapshot slot PRIMA di cancellare (silenzioso, per audit DB)
+      this.setConnectStatus('🔍','LETTURA IN CORSO','Lettura configurazione attuale...');
       const slotSnapshot = [];
       for (let i=0; i<8; i++) {
         let name = null, uid = null;
         try { name = await this.ultra.cmdSlotGetFreqName(i, FreqType.HF); } catch(e) {}
         if (name && name.trim()) {
+          // Attiva lo slot per leggere l'UID anti-collision
           try {
             await this.ultra.cmdSlotSetActive(i);
-            await new Promise(r=>setTimeout(r,50)); // Respiro universale
+            await new Promise(r=>setTimeout(r,30));
             const ac = await this.ultra.cmdHf14aGetAntiCollData();
             if (ac?.uid) {
               uid = Array.from(ac.uid).map(b=>b.toString(16).padStart(2,'0').toUpperCase()).join(':');
@@ -1131,97 +1505,63 @@ window.bleEngine = {
           slotSnapshot.push({ slot: i+1, name: name.trim(), uid: uid || null });
         }
       }
+      // Conserva snapshot in memoria — verrà salvato con session_id dopo start_session
       this._pendingSnapshot = slotSnapshot.length > 0 ? slotSnapshot : null;
 
+      // 2. Cancella immediatamente tutti gli slot per sicurezza
       this.setConnectStatus('🧹','PULIZIA IN CORSO','Cancellazione slot precedenti...');
       for (let i=0; i<8; i++) {
         await this.ultra.cmdSlotChangeTagType(i, TagType.MIFARE_1024);
         await this.ultra.cmdSlotResetTagType(i, TagType.MIFARE_1024);
         await this.ultra.cmdSlotSetEnable(i, FreqType.HF, false);
         await this.ultra.cmdSlotDeleteFreqName(i, FreqType.HF).catch(()=>{});
-        
-        // TIMING UNIVERSALE: 150ms salva il V1, impercettibile per V2/V3
-        await new Promise(r=>setTimeout(r,150));
+        await new Promise(r=>setTimeout(r,50));
       }
-      
       await this.ultra.cmdSlotSaveSettings();
-      await new Promise(r=>setTimeout(r,400)); // Tempo per la memoria flash
+      await new Promise(r=>setTimeout(r,200));
+      await this.ultra.cmdChangeDeviceMode(DeviceMode.TAG);
 
-      // CAMBIO MODALITA' UNIVERSALE SICURO
-      try { await this.ultra.cmdChangeDeviceMode(DeviceMode.TAG); } catch(e) {}
-
+      // Reset mapping locale
       app.mapping = { 1:null,2:null,3:null,4:null,5:null,6:null,7:null,8:null };
       app.renderSlots();
-      this.setConnectStatus('✅','PRONTO','Chameleon pronto. Seleziona le tessere.');
+
+      this.setConnectStatus('✅','PRONTO','Chameleon pulito. Seleziona le tessere da caricare.');
       document.getElementById('connect-back-btn').classList.add('hidden');
+      // Mostra la sezione selezione slot
       document.getElementById('connect-config-section').classList.remove('hidden');
 
     } catch(err) {
       bleEngine._bleLog('ERRORE: ' + (err.message||String(err)), true);
-      this.setConnectStatus('❌','ERRORE CONNESSIONE',`${err.message}\n\nAssicurati che il Bluetooth sia attivo.\n\n🔧 Vedi il log debug qui sopra e premi "Copia log" per mandarcelo.`,true);
+      console.error('[CONNECT ERROR]',err);
+      this.setConnectStatus('❌','ERRORE CONNESSIONE',`${err.message}\n\nAssicurati che il Bluetooth sia attivo e il Chameleon Ultra sia acceso.`,true);
       if (this.ultra){try{await this.ultra.disconnect();}catch(e){} this.ultra=null;}
     }
   },
 
-  // ── PASSO 2: Scrivi slot ──
+  // ── PASSO 2: Scrivi slot — BLE già connesso ──
   async startSync(mapping, telegramId) {
     this.updateUI(0,'Scrittura tessere in corso...','working');
     try {
       const { TagType, FreqType, DeviceMode } = window.ChameleonUltraJS;
-      if (!this.ultra) throw new Error('Dispositivo non connesso. Torna indietro e riconnetti.');
 
-      // Solo slot 1, 5, 8 — compatibili V1/V2/V3/V4
-      const ALLOWED_SLOTS = [1, 5, 8];
+      // BLE deve essere già connesso dal passo 1
+      if (!this.ultra) throw new Error('Dispositivo non connesso. Torna indietro e connetti il Chameleon.');
+
       const slotsToWrite=[];
-      for (let i=1;i<=8;i++) {
-        if(mapping[i] && ALLOWED_SLOTS.includes(i))
-          slotsToWrite.push({slotIdx:i-1, slotNum:i, card:mapping[i]});
-      }
+      for (const i of [1,5,8]) if(mapping[i]) slotsToWrite.push({slotIdx:i-1,card:mapping[i]});
       if (slotsToWrite.length===0) throw new Error('Nessuno slot selezionato.');
 
-      this.updateUI(5,'🧹 Reset globale degli slot...','working');
-
-      // Firmware vecchio (<2.0): wipe flash per azzerare stato inconsistente
-      // cmdWipeFds = equivalente di factory_reset --force — azzeramento completo flash
-      if (bleEngine.hwVersion === 1) {
-        this.updateUI(5,'🔄 Reset firmware...','working');
-        try {
-          const supported = await this.ultra.cmdGetSupportedCmds().catch(()=>null);
-          const wipeCmdId = 1014;
-          if (!supported || supported.includes(wipeCmdId)) {
-            await this.ultra.cmdWipeFds();
-            bleEngine._bleLog('cmdWipeFds OK (flash azzerato)');
-          } else {
-            bleEngine._bleLog('cmdWipeFds non supportato da questo firmware, skip', true);
-          }
-        } catch(e) {
-          bleEngine._bleLog('cmdWipeFds ERRORE: ' + (e.message||e), true);
-        }
-        await new Promise(r=>setTimeout(r,1200));
-      }
-
+      // Reset globale tutti gli 8 slot
+      this.updateUI(5,'🧹 Reset globale degli 8 slot...','working');
       for (let i=0;i<8;i++) {
-        // try/catch su ogni op: se V1 fallisce non genera throw → no logout
-        try { await this.ultra.cmdSlotChangeTagType(i,TagType.MIFARE_1024); }
-        catch(e) {
-          bleEngine._bleLog(`cmdSlotChangeTagType slot ${i} retry (${e.message||e})`, true);
-          await new Promise(r=>setTimeout(r,300));
-          try { await this.ultra.cmdSlotChangeTagType(i,TagType.MIFARE_1024); }
-          catch(e2){ bleEngine._bleLog(`cmdSlotChangeTagType slot ${i} fallito dopo retry`, true); }
-        }
-        try { await this.ultra.cmdSlotResetTagType(i,TagType.MIFARE_1024); }
-        catch(e) {
-          bleEngine._bleLog(`cmdSlotResetTagType slot ${i} retry (${e.message||e})`, true);
-          await new Promise(r=>setTimeout(r,300));
-          try { await this.ultra.cmdSlotResetTagType(i,TagType.MIFARE_1024); }
-          catch(e2){ bleEngine._bleLog(`cmdSlotResetTagType slot ${i} fallito dopo retry`, true); }
-        }
-        await this.ultra.cmdSlotSetEnable(i,FreqType.HF,false).catch(()=>{});
+        await this.ultra.cmdSlotChangeTagType(i,TagType.MIFARE_1024);
+        await this.ultra.cmdSlotResetTagType(i,TagType.MIFARE_1024);
+        await this.ultra.cmdSlotSetEnable(i,FreqType.HF,false);
         await this.ultra.cmdSlotDeleteFreqName(i,FreqType.HF).catch(()=>{});
-        await new Promise(r=>setTimeout(r,150)); // TIMING UNIVERSALE
+        await new Promise(r=>setTimeout(r,50));
       }
       await this.ultra.cmdSlotSaveSettings();
-      await new Promise(r=>setTimeout(r,300));
+      await new Promise(r=>setTimeout(r,200));
 
       const total=slotsToWrite.length;
       const loadedLabels=[];
@@ -1230,35 +1570,37 @@ window.bleEngine = {
         const {slotIdx,card}=slotsToWrite[idx];
         const base=10+(idx/total)*80;
 
-        this.updateUI(base,`[${idx+1}/${total}] Configurazione ${card.slot_label}...`,'working');
+        this.updateUI(base,`[${idx+1}/${total}] Download: ${card.slot_label}...`,'working');
         const res=await app.apiCall({action:'get_json_content',user_id:telegramId,slot_id:card.id});
         const profile=detectCardProfile(res);
         if (profile.writeMode==='unsupported') throw new Error(`Tessera non supportata: ${profile.tagName}`);
+        console.log(`[SLOT ${slotIdx+1}] ${profile.tagName} | ${profile.numBlocks} blocchi | UID: ${profile.uid.toString('hex')}`);
 
+        this.updateUI(base+(80/total)*0.3,`[${idx+1}/${total}] Configurazione slot ${slotIdx+1}...`,'working');
         await this.ultra.cmdSlotSetActive(slotIdx);
         await this.ultra.cmdSlotChangeTagType(slotIdx,profile.tagType);
         await this.ultra.cmdSlotResetTagType(slotIdx,profile.tagType);
         await this.ultra.cmdSlotSetEnable(slotIdx,FreqType.HF,true);
-        await new Promise(r=>setTimeout(r,100)); // TIMING UNIVERSALE
+        await new Promise(r=>setTimeout(r,50));
         await this.ultra.cmdSlotSetFreqName(slotIdx,FreqType.HF,card.slot_label);
         await this.ultra.cmdHf14aSetAntiCollData({uid:profile.uid,atqa:profile.atqa,sak:profile.sak,ats:profile.ats});
 
-        this.updateUI(base+(80/total)*0.5,`[${idx+1}/${total}] Scrittura blocchi...`,'working');
+        this.updateUI(base+(80/total)*0.5,`[${idx+1}/${total}] Scrittura ${profile.numBlocks} blocchi...`,'working');
         for (let block=0;block<profile.numBlocks;block++) {
           const chunk=profile.body.slice(block*16,(block+1)*16);
+          // Retry automatico in caso di timeout BLE
           for (let attempt=0; attempt<3; attempt++) {
             try {
               await this.ultra.cmdMf1EmuWriteBlock(block,chunk);
               break;
             } catch(e) {
-              if (attempt===2) throw e;
-              await new Promise(r=>setTimeout(r,300));
+              if (attempt===2) throw e; // fallisce dopo 3 tentativi
+              await new Promise(r=>setTimeout(r,300)); // pausa prima di retry
             }
           }
-          
-          // TIMING UNIVERSALE: Pausa ogni 8 blocchi per evitare saturazione buffer V1
-          if (block>0 && block%8===0) {
-            await new Promise(r=>setTimeout(r,150)); 
+          // Pausa ogni 16 blocchi per dare respiro al BLE
+          if (block>0 && block%16===0) {
+            await new Promise(r=>setTimeout(r,80));
           }
           if (block%8===0||block===profile.numBlocks-1) {
             const wp=base+(80/total)*0.5+(80/total)*0.45*(block/profile.numBlocks);
@@ -1266,104 +1608,87 @@ window.bleEngine = {
           }
         }
         loadedLabels.push(card.slot_label);
-        await new Promise(r=>setTimeout(r,200));
+        this.updateUI(base+(80/total)*0.98,`Slot ${slotIdx+1} scritto ✓`,'working');
+        await new Promise(r=>setTimeout(r,150));
       }
 
-      this.updateUI(92,'💾 Salvataggio in corso...','working');
+      this.updateUI(92,'💾 Salvataggio...','working');
       await this.ultra.cmdSlotSaveSettings();
-      await new Promise(r=>setTimeout(r,800));
+      await new Promise(r=>setTimeout(r,150));
 
       this.updateUI(96,'🔄 Attivazione TAG...','working');
-      
-      // CAMBIO MODALITA' UNIVERSALE SICURO
-      try { 
-        await this.ultra.cmdChangeDeviceMode(DeviceMode.READER);
-        await new Promise(r=>setTimeout(r,300));
-        await this.ultra.cmdChangeDeviceMode(DeviceMode.TAG);
-      } catch(e) {}
+      await this.ultra.cmdChangeDeviceMode(DeviceMode.READER);
+      await new Promise(r=>setTimeout(r,300));
+      await this.ultra.cmdChangeDeviceMode(DeviceMode.TAG);
 
+      // BLE rimane connesso — avvia sessione sicura
       this.updateUI(100,'✅ Tessere caricate! Avvio sessione...','success');
       if(navigator.vibrate)navigator.vibrate([100,50,100]);
       await new Promise(r=>setTimeout(r,800));
-      
+      // Registra apertura sessione nel DB e aggancia lo snapshot
       const geo = app._pendingGeoLocation || {};
       app.apiCall({
-        action:  'start_session', user_id: telegramId, slots: loadedLabels.join(','),
-        lat: geo.lat || '', lng: geo.lng || '', acc: geo.acc || '',
+        action:  'start_session',
+        user_id: telegramId,
+        slots:   loadedLabels.join(','),
+        lat:     geo.lat || '',
+        lng:     geo.lng || '',
+        acc:     geo.acc || '',
       }).then(res => {
         const sessionId = res?.session_id;
+        // Memorizza session_id in secureSession per la survey post-sessione
+        secureSession._sessionId = sessionId || null;
+        // Salva snapshot con session_id se disponibile
         const snap = bleEngine._pendingSnapshot;
         if (snap && snap.length > 0) {
-          app.apiCall({ action: 'save_slot_snapshot', user_id: telegramId, snapshot: JSON.stringify(snap), session_id: sessionId || '' }).catch(()=>{});
+          app.apiCall({
+            action:     'save_slot_snapshot',
+            user_id:    telegramId,
+            snapshot:   JSON.stringify(snap),
+            session_id: sessionId || '',
+          }).catch(()=>{});
           bleEngine._pendingSnapshot = null;
         }
       }).catch(()=>{});
-      
       secureSession.start(loadedLabels);
 
     } catch(err) {
+      bleEngine._bleLog('ERRORE SYNC: ' + (err.message||String(err)), true);
       console.error('[SYNC ERROR]',err);
       this.updateUI(0,`❌ ERRORE:\n${err.message||err}`,'error');
       if(this.ultra){try{await this.ultra.disconnect();}catch(e){} this.ultra=null;}
     }
   },
 
-  // ── PASSO 3: Cancella tutti gli slot e Disconnetti ──
+  // ── PASSO 3: Cancella tutti gli slot — BLE ancora connesso ──
   async wipeAllSlots(setWipe) {
     const { TagType, FreqType, DeviceMode } = window.ChameleonUltraJS;
+
+    // Riusa connessione esistente se disponibile
     if (!this.ultra) {
+      // BLE perso: dobbiamo riconnetterci
       setWipe('📶','RICONNESSIONE','Connessione persa. Tentativo di riconnessione...');
       const { ChameleonUltra } = window.ChameleonUltraJS;
       this.ultra = new ChameleonUltra();
       await this.ultra.use(new window.ChameleonUltraJS.WebbleAdapter());
+      // Nota: questo richiede un secondo popup — se fallisce, è gestito dal catch in secureSession
       await this.ultra.connect();
     }
 
     setWipe('🗑️','CANCELLAZIONE IN CORSO','Pulizia slot...');
     for (let i=0;i<8;i++) {
-      await this.ultra.cmdSlotChangeTagType(i,TagType.MIFARE_1024);
-      await this.ultra.cmdSlotResetTagType(i,TagType.MIFARE_1024);
-      await this.ultra.cmdSlotSetEnable(i,FreqType.HF,false);
+      await this.ultra.cmdSlotChangeTagType(i,TagType.MIFARE_1024).catch(()=>{});
+      await this.ultra.cmdSlotResetTagType(i,TagType.MIFARE_1024).catch(()=>{});
+      await this.ultra.cmdSlotSetEnable(i,FreqType.HF,false).catch(()=>{});
       await this.ultra.cmdSlotDeleteFreqName(i,FreqType.HF).catch(()=>{});
-      await new Promise(r=>setTimeout(r,800)); // TIMING UNIVERSALE
+      await new Promise(r=>setTimeout(r,30));
       setWipe('🗑️','CANCELLAZIONE IN CORSO',`Slot ${i+1}/8 cancellato...`);
     }
-    
-    // Firmware vecchio: wipe flash dopo cancellazione per garantire stato pulito
-    // Questo risolve il bug "seconda sessione" su SE/SE2 con firmware <2.0
-    if (this.hwVersion === 1) {
-      try {
-        const supported = await this.ultra.cmdGetSupportedCmds().catch(()=>null);
-        const wipeCmdId = 1014;
-        if (!supported || supported.includes(wipeCmdId)) {
-          await this.ultra.cmdWipeFds();
-        }
-      } catch(e) { console.warn('[BLE] cmdWipeFds non supportato:', e.message); }
-      await new Promise(r=>setTimeout(r,1200));
-    }
-
-    await this.ultra.cmdSlotSaveSettings();
-    await new Promise(r=>setTimeout(r,1000)); // Tempo lungo per salvataggio Flash
-
-    // DISCONNESSIONE UNIVERSALE SICURA (V1, V2, V3)
-    try { await this.ultra.cmdChangeDeviceMode(DeviceMode.TAG); } catch(e) {}
-    
-    // Dummy Read per svuotare il buffer BLE prima del disconnect
-    try { await this.ultra.cmdGetAppVersion(); } catch(e) {}
-    
-    await new Promise(r=>setTimeout(r,1500)); // Respiro finale prima del taglio
-
-    try {
-        if (this.ultra.adapter && typeof this.ultra.adapter.disconnect === 'function') {
-            await this.ultra.adapter.disconnect();
-        } else {
-            await this.ultra.disconnect();
-        }
-    } catch(e) {
-        console.warn("Disconnessione forzata:", e);
-    } finally {
-        this.ultra = null;
-    }
+    await this.ultra.cmdSlotSaveSettings().catch(()=>{});
+    await new Promise(r=>setTimeout(r,100));
+    await this.ultra.cmdChangeDeviceMode(DeviceMode.TAG);
+    await this.ultra.disconnect();
+    this.ultra=null;
   },
 };
 
