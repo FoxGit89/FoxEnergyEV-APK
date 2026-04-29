@@ -153,8 +153,8 @@ const app = {
       this.renderDashboard();
       this.renderSlots();
       this.showScreen('dashboard-screen');
+      this._initMiniMap();
       this._initCarousel();
-      this._renderGestori();
     } catch(e) { console.error(e); alert(`Errore:\n${e.message||'Connessione fallita.'}`); this.logout(); }
   },
 
@@ -308,69 +308,13 @@ const app = {
     return parts[0].slice(0,2).toUpperCase();
   },
 
-  // ── GESTORI COMPATIBILI ──
-  _renderGestori() {
-    const section = document.getElementById('dash-gestori-section');
-    const track   = document.getElementById('dash-gestori-track');
-    const badge   = document.getElementById('dash-gestori-count');
-    if (!section || !track || !this.cards || !this.cards.length) return;
-
-    // Merge di tutti gli operatori da tutte le tessere, deduplicati
-    const opsMap = {}; // operator_name → {usage_count, cards:[]}
-    (this.cards||[]).forEach(card => {
-      (card.roaming_detail||[]).forEach(r => {
-        const key = r.operator_name;
-        if (!opsMap[key]) opsMap[key] = { usage_count:0, cards:[] };
-        opsMap[key].usage_count += parseInt(r.usage_count)||0;
-        if (!opsMap[key].cards.includes(card.slot_label))
-          opsMap[key].cards.push(card.slot_label);
-      });
-    });
-
-    // Ordina: usati prima (per utilizzi desc), poi nuovi
-    const ops = Object.entries(opsMap)
-      .map(([name,d]) => ({name, ...d}))
-      .sort((a,b) => b.usage_count - a.usage_count);
-
-    if (!ops.length) return;
-
-    badge.textContent = ops.length + (ops.length===1?' rete':' reti');
-    track.innerHTML = ops.map(op => {
-      const col   = this._opColor(op.name);
-      const ini   = this._opInitials(op.name);
-      const used  = op.usage_count > 0;
-      const avatarStyle = used
-        ? `background:${col.grad}`
-        : '';
-      return `<div class="dash-gestori-tile">
-        <div class="dash-gestori-avatar${used?'':' unused'}" style="${avatarStyle}">${this._esc(ini)}</div>
-        <div class="dash-gestori-name${used?'':' unused'}" title="${this._esc(op.name)}">${this._esc(op.name)}</div>
-        <div class="dash-gestori-uses${used?' used':' unused'}">${used ? op.usage_count+'×' : '0×'}</div>
-      </div>`;
-    }).join('');
-
-    section.classList.remove('hidden');
-  },
-
-  // ── MAPPA COLONNINE (rimossa — sostituita da carosello gestori) ──
-  showMap() { /* deprecata */ },
-
-  async _showMapOld() {
+  // ── MAPPA COLONNINE OCM CON FUZZY MATCHING DAL BACKEND ──
+  async showMap() {
     app.showScreen('map-screen');
-    document.getElementById('map-loading').style.display = 'flex';
-    document.getElementById('map-loading-text').textContent = 'Rilevamento posizione...';
-
-    // Raccogli tutti gli operator_name dalle tessere dell'utente
-    const userOps = [];
-    const cardToOps = {}; // operatore → lista tessere
-    (this.cards || []).forEach(card => {
-      (card.roaming_detail || []).forEach(r => {
-        const op = r.operator_name.toLowerCase();
-        userOps.push(op);
-        if (!cardToOps[op]) cardToOps[op] = [];
-        cardToOps[op].push(card.slot_label);
-      });
-    });
+    const mapLoading = document.getElementById('map-loading');
+    const mapLoadingText = document.getElementById('map-loading-text');
+    mapLoading.style.display = 'flex';
+    mapLoadingText.textContent = 'Rilevamento posizione...';
 
     // Inizializza mappa Leaflet (una sola volta)
     if (!this._map) {
@@ -380,10 +324,18 @@ const app = {
         maxZoom: 18,
       }).addTo(this._map);
     }
+    
+    // Inizializza Mini-Mappa Dashboard
+    if (!this._miniMap) {
+      this._miniMap = L.map('dash-mini-map', { zoomControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '',
+        maxZoom: 18,
+      }).addTo(this._miniMap);
+    }
 
-    // Ottieni posizione utente
     if (!navigator.geolocation) {
-      document.getElementById('map-loading-text').textContent = 'GPS non disponibile';
+      mapLoadingText.textContent = 'GPS non disponibile';
       return;
     }
 
@@ -391,234 +343,70 @@ const app = {
       const lat = pos.coords.latitude;
       const lng = pos.coords.longitude;
 
-      // Centra mappa sull'utente
+      // Centra mappa principale sull'utente
       this._map.setView([lat, lng], 14);
+      // Aggiorna anche mini mappa
+      this._miniMap.setView([lat, lng], 14);
 
-      // Marker posizione utente
       if (this._userMarker) this._userMarker.remove();
       this._userMarker = L.circleMarker([lat, lng], {
         radius: 10, fillColor: '#FF9800', color: '#fff',
         weight: 3, opacity: 1, fillOpacity: 1,
       }).addTo(this._map).bindPopup('📍 Sei qui');
+      
+      if (this._miniUserMarker) this._miniUserMarker.remove();
+      this._miniUserMarker = L.circleMarker([lat, lng], {
+        radius: 8, fillColor: '#FF9800', color: '#fff',
+        weight: 2, opacity: 1, fillOpacity: 1,
+      }).addTo(this._miniMap);
 
-      document.getElementById('map-loading-text').textContent = 'Caricamento colonnine...';
+      mapLoadingText.textContent = 'Caricamento colonnine...';
 
-      // Chiama Overpass API (OpenStreetMap) — gratuita, nessuna key, CORS ok
       try {
-        // Raggio 5km attorno alla posizione
-        const radius = 5000;
-        // Query Overpass: sintassi corretta per nodi e way con tutti i tag
-        // 'out body' = tutti i tag, 'center' = coordinate centroide per way, limit dopo
-        const query = `[out:json][timeout:20];
-          (
-            node["amenity"="charging_station"](around:${radius},${lat},${lng});
-            way["amenity"="charging_station"](around:${radius},${lat},${lng});
-          );
-          out body center 50;`;
-        const resp = await fetch('https://overpass-api.de/api/interpreter', {
-          method: 'POST',
-          body: query,
-          headers: { 'Content-Type': 'text/plain' },
+        const resp = await this.apiCall({
+          action: 'get_map_pois',
+          lat: lat,
+          lng: lng,
+          radius: 5, // 5 km
+          user_id: this.user.telegramId
         });
-        const data = await resp.json();
 
-        // Normalizza in formato simile a OCM
-        const pois = data.elements.map(el => ({
-          id:       el.id,
-          lat:      el.lat || el.center?.lat,
-          lng:      el.lon || el.center?.lon,
-          name:     el.tags?.name || el.tags?.operator || el.tags?.brand || 'Colonnina',
-          operator: el.tags?.operator || el.tags?.['operator:it'] || '',
-          brand:    el.tags?.brand || '',
-          network:  el.tags?.network || el.tags?.['network:it'] || '',
-          operator_wikidata: el.tags?.['operator:wikidata'] || '',
-          // Concatena tutti i valori dei tag per un matching più ampio
-          allTags:  Object.values(el.tags || {}).join(' '),
-          socket:   [
-            el.tags?.['socket:type2']   ? 'Type2' : '',
-            el.tags?.['socket:ccs2']    ? 'CCS' : '',
-            el.tags?.['socket:chademo'] ? 'CHAdeMO' : '',
-            el.tags?.['socket:tesla_supercharger'] ? 'Tesla' : '',
-          ].filter(Boolean).join(', '),
-          capacity: el.tags?.capacity || '',
-        })).filter(p => p.lat && p.lng);
+        if (resp.error) throw new Error(resp.error);
 
         // Rimuovi marker colonnine precedenti
         if (this._stationMarkers) this._stationMarkers.forEach(m => m.remove());
         this._stationMarkers = [];
+        
+        if (this._miniStationMarkers) this._miniStationMarkers.forEach(m => m.remove());
+        this._miniStationMarkers = [];
 
-        // Dizionario di normalizzazione: varianti utente → keywords OSM
-        // OSM usa operator=, brand=, network=, name= in modo inconsistente
-        // Includiamo tutte le varianti documentate + wikidata IDs comuni
-        const OP_NORM = {
-          // Enel X / JuicePass
-          'enelx':        ['enel x','enel','juicepass','e-distribuzione','endesa'],
-          'enel x':       ['enel x','enel','juicepass'],
-          'enel x / ewiva':['enel','ewiva'],
-          // Plenitude / Be Charge / ENI
-          'plenitude':    ['plenitude','be charge','becharge','be_charge','be power','bepower','be-charge','eni gas','eni plenitude','plenitude on the road'],
-          // Free To X / Autostrade
-          'f2x':        ['free to x','free2x','f2x','freetox','autostrade'],
-          'f2x':        ['free to x','free2x','f2x','freetox'],
-          'free2x':       ['free to x','free2x','f2x'],
-          'free to x':    ['free to x','free2x','f2x'],
-          'freetox':      ['free to x','free2x','f2x'],
-          // Atlante / Nhoa
-          'atlante':      ['atlante','nhoa'],
-          // Electra
-          'electra':      ['electra'],
-          'electriese':   ['electra'],
-          'alectriase':   ['electra'],
-          'electriase':   ['electra'],
-          'electra france':['electra'],
-          // Duferco
-          'duferco':      ['duferco','duferco energia'],
-          // A2A
-          'a2a':        ['a2a','a2a energia','a2a smart city'],
-          // Ionity
-          'ionity':       ['ionity'],
-          // Ewiva / Volkswagen
-          'ewiva':        ['ewiva','volkswagen','vw'],
-          // Acea
-          'acea':         ['acea'],
-          // Allego
-          'allego':       ['allego','nuon'],
-          // Ayvens / Arval
-          'ayvens':       ['ayvens','arval','leaseplan'],
-          // GES
-          'ges':        ['ges','gestione energie'],
-          // IP Planet
-          'iplanet':      ['ip planet','iplanet','ip charge','italiana petroli'],
-          'ip planet':    ['ip planet','iplanet'],
-          'ip':         ['ip planet','iplanet','ip charge'],
-          'ipplanet':     ['ip planet','iplanet'],
-          // Powy
-          'powy':         ['powy'],
-          // Electrip
-          'electrip':     ['electrip'],
-          // Neogy
-          'neogy':        ['neogy'],
-          // Ecotap
-          'ecotap':       ['ecotap'],
-          'eco tap':      ['ecotap'],
-          // Q8 / Electra
-          'q8 electra':   ['q8','electra','kuwait petroleum'],
-          // Volvo
-          'volvo':        ['volvo'],
-          // Energetix
-          'energetix':    ['energetix'],
-          // Edison
-          'edison':       ['edison'],
-          // Alperia
-          'alperia':      ['alperia'],
-          // Nucleo
-          'nucleo':       ['nucleo'],
-          // Evway
-          'evway':        ['evway'],
-          // Emobitaly
-          'emobitaly':    ['emobi','emobitaly'],
-          // Estra
-          'estra':        ['estra'],
-          // E.ON
-          'eon':        ['e.on','eon'],
-          // TotalEnergies
-          'total':        ['totalenergies','total energies','total'],
-          // Go Electric
-          'go electric station':['go electric'],
-          // ChargePoint
-          'charge poin +':['chargepoint','charge point'],
-          // Jet Strom (e nuovi operatori zona Italia)
-          // Repower (zona Milano)
-          'repower':      ['repower','recharge around','dinaclub'],
-          // Fastway
-          'fastway':      ['fastway'],
-          // Nextcharge
-          'nextcharge':   ['nextcharge'],
-          // E-Moving
-          'e-moving':     ['e-moving','emoving'],
-          'jet strom':    ['jet strom','jetstrom'],
-          // Electrip
-          'electrip':     ['electrip','elec trip'],
-          // Powy
-          'powy':         ['powy'],
-          // Ewiva / Volkswagen Group Charging
-          'ewiva':        ['ewiva','volkswagen','vw','volkswagen group charging','elli'],
-          // Atlante / Nhoa Energy
-          'atlante':      ['atlante','nhoa','free electrons'],
-          // Electra (Italia e Francia)
-          'electra':      ['electra'],
-          'electriese':   ['electra'],
-          'alectriase':   ['electra'],
-          'electra france':['electra'],
-          // Ionity
-          'ionity':       ['ionity'],
-          // Tesla Supercharger
-          'tesla':        ['tesla'],
-          'volvo':        ['tesla','volvo'],
-          // Fastned
-          'fastned':      ['fastned'],
-          // Enel X Way (nuovo brand Enel X)
-          'enel x way':   ['enel x way','enel x','enel','juicepass'],
-          // Duferco
-          'duferco':      ['duferco','duferco energia'],
-          };
+        (resp.pois || []).forEach(poi => {
+          const color = poi.is_supported ? '#4CAF50' : '#9E9E9E';
+          const icon  = poi.is_supported ? '⚡' : '🔌';
 
-        // Normalizza: ogni operatore utente → lista di keywords OSM da cercare
-        const userKeywords = []; // [{keywords:[...], cards:[...]}]
-        userOps.forEach(op => {
-          const norm = OP_NORM[op.toLowerCase()] || [op.toLowerCase()]; // chiave lowercase
-          const existing = userKeywords.find(u => u.keywords.join() === norm.join());
-          if (existing) {
-            (cardToOps[op]||[]).forEach(c => { if(!existing.cards.includes(c)) existing.cards.push(c); });
-          } else {
-            userKeywords.push({ keywords: norm, cards: [...(cardToOps[op]||[])] });
-          }
-        });
-
-
-        pois.forEach(poi => {
-          const pLat = poi.lat;
-          const pLng = poi.lng;
-          if (!pLat || !pLng) return;
-
-          // Combina tutti i campi OSM rilevanti per il matching
-          const opTitle = [
-            poi.operator, poi.brand, poi.network, poi.name,
-            poi.operator_wikidata, poi.allTags
-          ].filter(Boolean).join(' ').toLowerCase();
-          const address = poi.name || poi.operator || '';
-          const town    = '';
-          const conns   = poi.socket ? poi.socket.replace('yes','').trim() : '';
-
-          // Matching: cerca se una keyword è contenuta nel titolo OSM (case-insensitive)
-          const matchedCards = [];
-          userKeywords.forEach(({keywords, cards}) => {
-            if (keywords.some(kw => opTitle.includes(kw))) {
-              cards.forEach(c => { if(!matchedCards.includes(c)) matchedCards.push(c); });
-            }
-          });
-
-          const hasMatch = matchedCards.length > 0;
-          const color    = hasMatch ? '#4CAF50' : '#9E9E9E';
-          const icon     = hasMatch ? '⚡' : '🔌';
-
-          const marker = L.circleMarker([pLat, pLng], {
-            radius: hasMatch ? 10 : 7,
+          // Marker per mappa principale
+          const marker = L.circleMarker([poi.lat, poi.lng], {
+            radius: poi.is_supported ? 10 : 7,
             fillColor: color, color: '#fff',
             weight: 2, opacity: 1, fillOpacity: 0.9,
           }).addTo(this._map);
 
+          // Marker per mini mappa
+          const miniMarker = L.circleMarker([poi.lat, poi.lng], {
+            radius: poi.is_supported ? 5 : 3,
+            fillColor: color, color: 'transparent',
+            weight: 0, opacity: 1, fillOpacity: 0.6,
+          }).addTo(this._miniMap);
+
           let popupHtml = `<div style="min-width:180px;font-family:sans-serif">`;
-          popupHtml += `<b style="font-size:13px">${icon} ${this._esc(address)}</b>`;
-          if (town) popupHtml += `<div style="color:#666;font-size:11px">${this._esc(town)}</div>`;
-          const opDisplay = poi.operator || poi.brand || '';
-          if (opDisplay) popupHtml += `<div style="margin-top:4px;font-size:12px">🏢 ${this._esc(opDisplay)}</div>`;
-          if (poi.capacity) popupHtml += `<div style="font-size:11px;color:#888">🔌 ${this._esc(poi.capacity)} punti</div>`;
-          if (conns) popupHtml += `<div style="font-size:11px;color:#555">🔌 ${this._esc(conns)}</div>`;
-          if (hasMatch) {
+          popupHtml += `<b style="font-size:13px">${icon} ${this._esc(poi.title)}</b>`;
+          const opDisplay = poi.operator || 'Operatore Sconosciuto';
+          popupHtml += `<div style="margin-top:4px;font-size:12px">🏢 ${this._esc(opDisplay)}</div>`;
+          
+          if (poi.is_supported) {
             popupHtml += `<div style="margin-top:8px;padding:6px 8px;background:#E8F5E9;border-radius:6px;font-size:12px">`;
             popupHtml += `<b style="color:#2E7D32">✅ Usa queste tessere:</b><br>`;
-            matchedCards.forEach(c => { popupHtml += `• ${this._esc(c)}<br>`; });
+            (poi.matched_slots || []).forEach(c => { popupHtml += `• ${this._esc(c)}<br>`; });
             popupHtml += `</div>`;
           } else {
             popupHtml += `<div style="margin-top:6px;font-size:11px;color:#999">Operatore non verificato nelle tue tessere</div>`;
@@ -661,6 +449,32 @@ const app = {
     }, (err) => {
       document.getElementById('map-loading-text').textContent = 'Permesso GPS negato';
     }, { timeout: 10000, enableHighAccuracy: false });
+  },
+
+  // ── MINI MAPPA DASHBOARD ──
+  _initMiniMap() {
+    if (!this._miniMap) {
+      this._miniMap = L.map('dash-mini-map', { zoomControl: false, dragging: false, scrollWheelZoom: false, doubleClickZoom: false });
+      L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        attribution: '',
+        maxZoom: 18,
+      }).addTo(this._miniMap);
+    }
+    
+    // Centra temporaneamente su Roma in attesa che l'utente apra la mappa vera
+    // o geolocalizza se permesso
+    if (navigator.geolocation) {
+        navigator.geolocation.getCurrentPosition((pos) => {
+          this._miniMap.setView([pos.coords.latitude, pos.coords.longitude], 14);
+        }, () => {
+          this._miniMap.setView([41.9028, 12.4964], 6); // Roma fallback
+        });
+    } else {
+        this._miniMap.setView([41.9028, 12.4964], 6);
+    }
+    
+    // Invalida size in caso fosse nascosta durante l'init
+    setTimeout(() => this._miniMap.invalidateSize(), 100);
   },
 
   // ── CAROSELLO ──

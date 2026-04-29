@@ -697,6 +697,179 @@ try {
         exit;
     }
 
+    // ── MAPPA COLONNINE OCM CON FUZZY MATCHING ──
+    if ($action === 'get_map_pois') {
+        $lat = $_GET['lat'] ?? '';
+        $lng = $_GET['lng'] ?? '';
+        $rad = $_GET['radius'] ?? 5; // km
+        
+        if (empty($lat) || empty($lng)) {
+            echo json_encode(['error' => 'Coordinate mancanti.']);
+            exit;
+        }
+
+        // 1. Estrai tutte le tessere abilitate per l'utente e i loro operatori supportati
+        $u_tg    = $user['telegram_id'];
+        $u_name  = $user['username'] ?? '';
+        $u_score = (int)($user['trust_score'] ?? 100);
+        $u_prem  = (int)($user['is_premium'] ?? 0);
+
+        $sql = "SELECT id, slot_label, rfid_uid, promo_from, promo_to, status
+                FROM rfid_slots WHERE status = 'active'
+                AND (
+                    (min_trust_score <= 0 AND (allowed_users IS NULL OR allowed_users = ''))
+                    OR (min_trust_score > 0 AND $u_score >= min_trust_score AND $u_prem = 1)
+                    OR FIND_IN_SET(" . db()->quote($u_tg) . ", allowed_users) > 0
+                    OR FIND_IN_SET(" . db()->quote($u_name) . ", allowed_users) > 0
+                )";
+        $slots = db()->query($sql)->fetchAll(PDO::FETCH_ASSOC);
+
+        $user_supported_ops = [];
+        $slot_map = []; // op_name -> [slot_id, slot_id]
+
+        foreach ($slots as &$slot) {
+            try {
+                $rs = db()->prepare("
+                    SELECT operator_name, SUM(usage_count) as usage_count
+                    FROM (
+                        SELECT t.operator_name, COUNT(*) as usage_count
+                        FROM transactions t
+                        WHERE t.rfid_slot_id = ? AND t.status = 'CONFIRMED'
+                          AND t.operator_name IS NOT NULL AND t.operator_name != 'N/D'
+                        GROUP BY t.operator_name
+                        UNION ALL
+                        SELECT rs2.operator_name, 0 as usage_count
+                        FROM roaming_settings rs2
+                        WHERE rs2.rfid_slot_id = ? AND rs2.is_forced = 1
+                    ) AS combined
+                    GROUP BY operator_name
+                    ORDER BY usage_count DESC, operator_name ASC
+                ");
+                $rs->execute([$slot['id'], $slot['id']]);
+                $ops = $rs->fetchAll(PDO::FETCH_ASSOC);
+                
+                foreach ($ops as $op) {
+                    $op_name = strtolower(trim($op['operator_name']));
+                    if (!in_array($op_name, $user_supported_ops)) {
+                        $user_supported_ops[] = $op_name;
+                    }
+                    if (!isset($slot_map[$op_name])) $slot_map[$op_name] = [];
+                    $slot_map[$op_name][] = $slot['slot_label'];
+                }
+            } catch(Exception $e) {}
+        }
+
+        // Array di normalizzazione Fuzzy
+        $op_norm = [
+          'enelx' => ['enel x','enel','juicepass','e-distribuzione','endesa','enel x way'],
+          'enel x' => ['enel x','enel','juicepass','enel x way'],
+          'enel x / ewiva' => ['enel','ewiva'],
+          'plenitude' => ['plenitude','be charge','becharge','be_charge','be power','bepower','be-charge','eni gas','eni plenitude','plenitude on the road'],
+          'f2x' => ['free to x','free2x','f2x','freetox','autostrade'],
+          'free2x' => ['free to x','free2x','f2x'],
+          'free to x' => ['free to x','free2x','f2x'],
+          'freetox' => ['free to x','free2x','f2x'],
+          'atlante' => ['atlante','nhoa'],
+          'electra' => ['electra'],
+          'electriese' => ['electra'],
+          'alectriase' => ['electra'],
+          'electriase' => ['electra'],
+          'electra france' => ['electra'],
+          'duferco' => ['duferco','duferco energia'],
+          'a2a' => ['a2a','a2a energia','a2a smart city'],
+          'ionity' => ['ionity'],
+          'ewiva' => ['ewiva','volkswagen','vw'],
+          'acea' => ['acea'],
+          'allego' => ['allego','nuon'],
+          'ayvens' => ['ayvens','arval','leaseplan'],
+          'ges' => ['ges','gestione energie'],
+          'iplanet' => ['ip planet','iplanet','ip charge','italiana petroli'],
+          'ip planet' => ['ip planet','iplanet'],
+          'ip' => ['ip planet','iplanet','ip charge'],
+          'fastned' => ['fastned'],
+          'enel x way' => ['enel x way','enel x','enel','juicepass']
+        ];
+
+        // Normalizza keywords supportate per utente
+        $user_keywords = [];
+        foreach ($user_supported_ops as $op) {
+            $norm_list = $op_norm[$op] ?? [$op];
+            foreach ($norm_list as $kw) {
+                if (!in_array($kw, $user_keywords)) {
+                    $user_keywords[] = $kw;
+                }
+            }
+        }
+
+        // 2. Chiamata a OpenChargeMap
+        $ocm_key = getenv('OCM_API_KEY');
+        if (empty($ocm_key)) {
+            echo json_encode(['error' => 'Chiave API OCM mancante nel server.']);
+            exit;
+        }
+
+        $ocm_url = "https://api.openchargemap.io/v3/poi?output=json&latitude={$lat}&longitude={$lng}&distance={$rad}&distanceunit=KM&maxresults=150&compact=true&verbose=false";
+        
+        $ch = curl_init();
+        curl_setopt($ch, CURLOPT_URL, $ocm_url);
+        curl_setopt($ch, CURLOPT_RETURNTRANSFER, 1);
+        curl_setopt($ch, CURLOPT_TIMEOUT, 15);
+        curl_setopt($ch, CURLOPT_HTTPHEADER, [
+            "X-API-Key: {$ocm_key}",
+            "User-Agent: FoxSync-App"
+        ]);
+        $response = curl_exec($ch);
+        curl_close($ch);
+
+        $pois = json_decode($response, true);
+        if (!is_array($pois)) $pois = [];
+
+        // 3. Valutazione POI
+        $filtered_pois = [];
+        foreach ($pois as $poi) {
+            $lat_poi = $poi['AddressInfo']['Latitude'] ?? 0;
+            $lng_poi = $poi['AddressInfo']['Longitude'] ?? 0;
+            $title = $poi['AddressInfo']['Title'] ?? '';
+            $operator = $poi['OperatorInfo']['Title'] ?? '';
+            
+            // Unisci title e operator in lowercase per la ricerca
+            $search_str = strtolower($title . ' ' . $operator);
+            
+            $is_supported = false;
+            $matched_slots = [];
+            
+            foreach ($user_keywords as $kw) {
+                if (strpos($search_str, $kw) !== false) {
+                    $is_supported = true;
+                    // Raccogli slot
+                    foreach ($slot_map as $op_name => $s_labels) {
+                        $norm_list = $op_norm[$op_name] ?? [$op_name];
+                        if (in_array($kw, $norm_list)) {
+                            foreach ($s_labels as $sl) {
+                                if (!in_array($sl, $matched_slots)) {
+                                    $matched_slots[] = $sl;
+                                }
+                            }
+                        }
+                    }
+                }
+            }
+            
+            $filtered_pois[] = [
+                'id' => $poi['ID'],
+                'lat' => $lat_poi,
+                'lng' => $lng_poi,
+                'title' => $title,
+                'operator' => $operator,
+                'is_supported' => $is_supported,
+                'matched_slots' => $matched_slots
+            ];
+        }
+
+        echo json_encode(['pois' => $filtered_pois]);
+        exit;
+    }
+
     // ── Notifica admin (BLE disconnesso ecc.) ──
     if ($action === 'notify_admin') {
         $event = $_GET['event'] ?? 'unknown';
