@@ -182,6 +182,18 @@
           <div class="map-dot grey"></div> Non supportata / Altro
         </div>
       </div>
+
+      <!-- Disclaimer Mappa -->
+      <div id="map-disclaimer" class="map-disclaimer">
+        <button class="map-disclaimer-close" onclick="document.getElementById('map-disclaimer').style.display='none'">✕</button>
+        <div style="font-weight:700;margin-bottom:4px;color:#FF9800;">⚠️ Attenzione</div>
+        Non tutte le colonnine sono visibili. Le tue tessere potrebbero attivare colonnine non in elenco, o non attivare alcune di quelle mostrate.
+      </div>
+
+      <!-- Pulsante Aggiorna Mappa -->
+      <button id="map-refresh-btn" class="map-refresh-btn" onclick="app.showMap()">
+        🔄
+      </button>
     </div>
   </div>
 

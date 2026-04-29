@@ -461,17 +461,15 @@ const app = {
       }).addTo(this._miniMap);
     }
     
-    // Centra temporaneamente su Roma in attesa che l'utente apra la mappa vera
-    // o geolocalizza se permesso
-    if (navigator.geolocation) {
-        navigator.geolocation.getCurrentPosition((pos) => {
-          this._miniMap.setView([pos.coords.latitude, pos.coords.longitude], 14);
-        }, () => {
-          this._miniMap.setView([41.9028, 12.4964], 6); // Roma fallback
-        });
-    } else {
-        this._miniMap.setView([41.9028, 12.4964], 6);
-    }
+    // Centra temporaneamente su Roma e usa IP geolocation se disponibile, per evitare richieste GPS premature.
+    this._miniMap.setView([41.9028, 12.4964], 6);
+    fetch('https://get.geojs.io/v1/ip/geo.json')
+      .then(r => r.json())
+      .then(geo => {
+        if (geo && geo.latitude && geo.longitude) {
+          this._miniMap.setView([parseFloat(geo.latitude), parseFloat(geo.longitude)], 12);
+        }
+      }).catch(e => console.log('IP geoloc failed', e));
     
     // Invalida size in caso fosse nascosta durante l'init
     setTimeout(() => this._miniMap.invalidateSize(), 100);

@@ -1130,6 +1130,58 @@ input {
 .map-dot.green { background: #4CAF50; }
 .map-dot.grey  { background: #9E9E9E; }
 
+.map-disclaimer {
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  right: 10px;
+  background: rgba(26, 26, 26, 0.9);
+  padding: 12px;
+  border-radius: 12px;
+  border: 1px solid rgba(255, 152, 0, 0.3);
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 11px;
+  line-height: 1.4;
+  z-index: 999;
+  backdrop-filter: blur(5px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.5);
+}
+
+.map-disclaimer-close {
+  position: absolute;
+  top: 6px;
+  right: 6px;
+  background: transparent;
+  border: none;
+  color: rgba(255, 255, 255, 0.5);
+  font-size: 16px;
+  cursor: pointer;
+  padding: 4px;
+}
+
+.map-refresh-btn {
+  position: absolute;
+  bottom: 24px;
+  right: 10px;
+  width: 44px;
+  height: 44px;
+  background: #FF9800;
+  border: none;
+  border-radius: 50%;
+  color: white;
+  font-size: 20px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.5);
+  z-index: 999;
+  cursor: pointer;
+}
+.map-refresh-btn:active {
+  transform: scale(0.95);
+  background: #e68a00;
+}
+
 /* ==========================================
    Sessione — tessere con gestori
    ========================================== */
