@@ -476,7 +476,7 @@ const app = {
         popupHtml += `<div style="margin-top:4px;font-size:12px;color:#ccc;">🔌 ${this._esc(connDisplay)}</div>`;
         
         if (poi.is_supported) {
-          popupHtml += `<div style="margin-top:8px;padding:6px 8px;background:rgba(76, 175, 80, 0.15);border: 1px solid rgba(76, 175, 80, 0.3);border-radius:6px;font-size:12px;color:#fff;">`;
+          popupHtml += `<div style="margin-top:8px;padding:6px 8px;background:rgba(76, 175, 80, 0.15);border: 1px solid rgba(76, 175, 80, 0.3);border-radius:6px;font-size:12px;color:#000;">`;
           popupHtml += `<b style="color:#4CAF50">✅ Usa queste tessere:</b><br>`;
           (poi.matched_slots || []).forEach(c => { popupHtml += `• ${this._esc(c)}<br>`; });
           popupHtml += `</div>`;
