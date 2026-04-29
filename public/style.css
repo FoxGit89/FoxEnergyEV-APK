@@ -1159,7 +1159,7 @@ input {
   padding: 4px;
 }
 
-.map-refresh-btn {
+.map-location-btn {
   position: absolute;
   bottom: 24px;
   right: 10px;
@@ -1177,7 +1177,7 @@ input {
   z-index: 999;
   cursor: pointer;
 }
-.map-refresh-btn:active {
+.map-location-btn:active {
   transform: scale(0.95);
   background: #e68a00;
 }

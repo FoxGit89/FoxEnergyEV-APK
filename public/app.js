@@ -312,10 +312,7 @@ const app = {
   async showMap() {
     app.showScreen('map-screen');
     const mapLoading = document.getElementById('map-loading');
-    const mapLoadingText = document.getElementById('map-loading-text');
-    mapLoading.style.display = 'flex';
-    mapLoadingText.textContent = 'Rilevamento posizione...';
-
+    
     // Inizializza mappa Leaflet (una sola volta)
     if (!this._map) {
       this._map = L.map('leaflet-map', { zoomControl: true });
@@ -323,6 +320,18 @@ const app = {
         attribution: '© OpenStreetMap',
         maxZoom: 18,
       }).addTo(this._map);
+
+      // Aggiungi listener per caricamento colonnine allo spostamento/zoom
+      this._map.on('moveend', () => {
+        // Se non abbiamo ancora fatto il fix iniziale, ignoriamo
+        if (!this._initialFixDone) return;
+        
+        // Debounce per evitare troppe chiamate API
+        clearTimeout(this._mapMoveTimeout);
+        this._mapMoveTimeout = setTimeout(() => {
+           this._fetchStationsForMap();
+        }, 500);
+      });
     }
     
     // Inizializza Mini-Mappa Dashboard
@@ -333,9 +342,28 @@ const app = {
         maxZoom: 18,
       }).addTo(this._miniMap);
     }
+    
+    setTimeout(() => this._map.invalidateSize(), 100);
+
+    // Eseguiamo il fix GPS la prima volta, o se richiesto
+    if (!this._initialFixDone) {
+      this.centerMapOnUser();
+    }
+  },
+
+  centerMapOnUser() {
+    const mapLoading = document.getElementById('map-loading');
+    const mapLoadingText = document.getElementById('map-loading-text');
+    mapLoading.style.display = 'flex';
+    mapLoadingText.textContent = 'Rilevamento posizione...';
 
     if (!navigator.geolocation) {
       mapLoadingText.textContent = 'GPS non disponibile';
+      setTimeout(() => { mapLoading.style.display = 'none'; }, 2000);
+      // Se non abbiamo GPS, usiamo una posizione di default per permettere l'uso
+      this._initialFixDone = true;
+      this._map.setView([41.9028, 12.4964], 14); // Roma
+      this._fetchStationsForMap();
       return;
     }
 
@@ -343,6 +371,7 @@ const app = {
       const lat = pos.coords.latitude;
       const lng = pos.coords.longitude;
 
+      this._initialFixDone = true;
       // Centra mappa principale sull'utente
       this._map.setView([lat, lng], 14);
       // Aggiorna anche mini mappa
@@ -359,96 +388,106 @@ const app = {
         radius: 8, fillColor: '#FF9800', color: '#fff',
         weight: 2, opacity: 1, fillOpacity: 1,
       }).addTo(this._miniMap);
-
-      mapLoadingText.textContent = 'Caricamento colonnine...';
-
-      try {
-        const resp = await this.apiCall({
-          action: 'get_map_pois',
-          lat: lat,
-          lng: lng,
-          radius: 5, // 5 km
-          user_id: this.user.telegramId
-        });
-
-        if (resp.error) throw new Error(resp.error);
-
-        // Rimuovi marker colonnine precedenti
-        if (this._stationMarkers) this._stationMarkers.forEach(m => m.remove());
-        this._stationMarkers = [];
-        
-        if (this._miniStationMarkers) this._miniStationMarkers.forEach(m => m.remove());
-        this._miniStationMarkers = [];
-
-        (resp.pois || []).forEach(poi => {
-          const color = poi.is_supported ? '#4CAF50' : '#9E9E9E';
-          const icon  = poi.is_supported ? '⚡' : '🔌';
-
-          // Marker per mappa principale
-          const marker = L.circleMarker([poi.lat, poi.lng], {
-            radius: poi.is_supported ? 10 : 7,
-            fillColor: color, color: '#fff',
-            weight: 2, opacity: 1, fillOpacity: 0.9,
-          }).addTo(this._map);
-
-          // Marker per mini mappa
-          const miniMarker = L.circleMarker([poi.lat, poi.lng], {
-            radius: poi.is_supported ? 5 : 3,
-            fillColor: color, color: 'transparent',
-            weight: 0, opacity: 1, fillOpacity: 0.6,
-          }).addTo(this._miniMap);
-
-          let popupHtml = `<div style="min-width:180px;font-family:sans-serif">`;
-          popupHtml += `<b style="font-size:13px">${icon} ${this._esc(poi.title)}</b>`;
-          const opDisplay = poi.operator || 'Operatore Sconosciuto';
-          popupHtml += `<div style="margin-top:4px;font-size:12px">🏢 ${this._esc(opDisplay)}</div>`;
-          
-          if (poi.is_supported) {
-            popupHtml += `<div style="margin-top:8px;padding:6px 8px;background:#E8F5E9;border-radius:6px;font-size:12px">`;
-            popupHtml += `<b style="color:#2E7D32">✅ Usa queste tessere:</b><br>`;
-            (poi.matched_slots || []).forEach(c => { popupHtml += `• ${this._esc(c)}<br>`; });
-            popupHtml += `</div>`;
-          } else {
-            popupHtml += `<div style="margin-top:6px;font-size:11px;color:#999">Operatore non verificato nelle tue tessere</div>`;
-          }
-          popupHtml += `</div>`;
-
-          marker.bindPopup(popupHtml);
-          this._stationMarkers.push(marker);
-        });
-
-        document.getElementById('map-loading').style.display = 'none';
-        setTimeout(() => this._map.invalidateSize(), 100);
-
-        // Pannello debug: mostra tag raw delle colonnine trovate
-        const debugPanel = document.getElementById('map-debug-panel');
-        if (debugPanel) {
-          const matched = pois.filter(p => {
-            const t = [p.operator,p.brand,p.network,p.name,p.allTags].filter(Boolean).join(' ').toLowerCase();
-            return userKeywords.some(({keywords}) => keywords.some(kw => t.includes(kw)));
-          }).length;
-
-          // Lista operatori unici trovati da OSM (operator + brand + name)
-          const rawOps = [...new Set(
-            pois.map(p => [p.operator, p.brand, p.network].filter(Boolean).join(' / ')).filter(Boolean)
-          )].slice(0,20);
-
-          const noTagCount = pois.filter(p => !p.operator && !p.brand && !p.network && !p.name).length;
-
-          debugPanel.innerHTML =
-            `<b>🔍 OSM:</b> ${pois.length} colonnine · <b style="color:#4CAF50">${matched} con tessera</b> · ${noTagCount} senza tag<br>` +
-            `<b>Operatori trovati:</b> ${rawOps.length ? rawOps.join(' | ') : '<i>nessun operator/brand tag in OSM</i>'}`;
-          debugPanel.style.display = 'block';
-        }
-
-      } catch(e) {
-        document.getElementById('map-loading-text').textContent = 'Errore caricamento colonnine';
-        console.error('[MAP]', e);
-      }
+      
+      mapLoading.style.display = 'none';
+      this._fetchStationsForMap();
 
     }, (err) => {
-      document.getElementById('map-loading-text').textContent = 'Permesso GPS negato';
+      let errorText = 'Errore GPS';
+      switch(err.code) {
+        case err.PERMISSION_DENIED:
+          errorText = 'Permesso GPS negato';
+          break;
+        case err.POSITION_UNAVAILABLE:
+          errorText = 'Posizione non disponibile';
+          break;
+        case err.TIMEOUT:
+          errorText = 'Timeout GPS. Riprova.';
+          break;
+      }
+      document.getElementById('map-loading-text').textContent = errorText;
+      setTimeout(() => { document.getElementById('map-loading').style.display = 'none'; }, 2000);
+      
+      // Fallback
+      if(!this._initialFixDone) {
+        this._initialFixDone = true;
+        this._map.setView([41.9028, 12.4964], 14);
+        this._fetchStationsForMap();
+      }
     }, { timeout: 10000, enableHighAccuracy: false });
+  },
+
+  async _fetchStationsForMap() {
+    if (!this._map) return;
+    
+    // Calcoliamo il centro e il raggio approssimativo in base ai bounds visibili
+    const center = this._map.getCenter();
+    const bounds = this._map.getBounds();
+    // Distanza in km dal centro all'angolo nord-est (approssimazione del raggio visibile)
+    const radiusMeters = center.distanceTo(bounds.getNorthEast());
+    // Convertiamo in km, con un minimo di 1km e massimo di 50km
+    let radiusKm = Math.min(Math.max(radiusMeters / 1000, 1), 50);
+
+    try {
+      // Potremmo mostrare uno spinner leggero qui se vogliamo
+      const resp = await this.apiCall({
+        action: 'get_map_pois',
+        lat: center.lat,
+        lng: center.lng,
+        radius: radiusKm,
+        user_id: this.user.telegramId
+      });
+
+      if (resp.error) throw new Error(resp.error);
+
+      // Rimuovi marker colonnine precedenti
+      if (this._stationMarkers) this._stationMarkers.forEach(m => m.remove());
+      this._stationMarkers = [];
+      
+      if (this._miniStationMarkers) this._miniStationMarkers.forEach(m => m.remove());
+      this._miniStationMarkers = [];
+
+      (resp.pois || []).forEach(poi => {
+        const color = poi.is_supported ? '#4CAF50' : '#9E9E9E';
+        const icon  = poi.is_supported ? '⚡' : '🔌';
+
+        // Marker per mappa principale
+        const marker = L.circleMarker([poi.lat, poi.lng], {
+          radius: poi.is_supported ? 10 : 7,
+          fillColor: color, color: '#fff',
+          weight: 2, opacity: 1, fillOpacity: 0.9,
+        }).addTo(this._map);
+
+        // Marker per mini mappa
+        const miniMarker = L.circleMarker([poi.lat, poi.lng], {
+          radius: poi.is_supported ? 5 : 3,
+          fillColor: color, color: 'transparent',
+          weight: 0, opacity: 1, fillOpacity: 0.6,
+        }).addTo(this._miniMap);
+
+        let popupHtml = `<div style="min-width:180px;font-family:sans-serif">`;
+        popupHtml += `<b style="font-size:13px">${icon} ${this._esc(poi.title)}</b>`;
+        const opDisplay = poi.operator || 'Operatore Sconosciuto';
+        popupHtml += `<div style="margin-top:4px;font-size:12px">🏢 ${this._esc(opDisplay)}</div>`;
+        
+        if (poi.is_supported) {
+          popupHtml += `<div style="margin-top:8px;padding:6px 8px;background:#E8F5E9;border-radius:6px;font-size:12px">`;
+          popupHtml += `<b style="color:#2E7D32">✅ Usa queste tessere:</b><br>`;
+          (poi.matched_slots || []).forEach(c => { popupHtml += `• ${this._esc(c)}<br>`; });
+          popupHtml += `</div>`;
+        } else {
+          popupHtml += `<div style="margin-top:6px;font-size:11px;color:#999">Operatore non verificato nelle tue tessere</div>`;
+        }
+        popupHtml += `</div>`;
+
+        marker.bindPopup(popupHtml);
+        this._stationMarkers.push(marker);
+        this._miniStationMarkers.push(miniMarker);
+      });
+      
+    } catch(e) {
+      console.error('[MAP FETCH]', e);
+    }
   },
 
   // ── MINI MAPPA DASHBOARD ──
