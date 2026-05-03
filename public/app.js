@@ -155,6 +155,8 @@ const app = {
       this.showScreen('dashboard-screen');
       this._initMiniMap();
       this._initCarousel();
+      this._renderGestori();
+      setTimeout(() => this._initPush(), 2000);
     } catch(e) { console.error(e); alert(`Errore:\n${e.message||'Connessione fallita.'}`); this.logout(); }
   },
 
@@ -306,6 +308,72 @@ const app = {
     const parts=key.replace(/[^a-z0-9 ]/g,'').trim().split(' ').filter(Boolean);
     if(parts.length>=2) return (parts[0][0]+(parts[1][0]||'')).toUpperCase();
     return parts[0].slice(0,2).toUpperCase();
+  },
+
+  // ── WEB PUSH NOTIFICATIONS ──
+  async _initPush() {
+    // Controlla supporto browser
+    if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
+      console.log('[PUSH] Non supportato su questo browser/dispositivo');
+      return;
+    }
+
+    // Su iOS: funziona solo se installata come PWA (standalone)
+    const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
+    if (isIOS && !window.navigator.standalone) {
+      console.log('[PUSH] iOS: aggiungi alla schermata Home per le notifiche');
+      return;
+    }
+
+    // Controlla permesso attuale
+    if (Notification.permission === 'denied') return;
+
+    try {
+      const reg = await navigator.serviceWorker.ready;
+
+      // Già iscritto?
+      let sub = await reg.pushManager.getSubscription();
+
+      if (!sub) {
+        // Chiedi permesso e iscrivi
+        const permission = await Notification.requestPermission();
+        if (permission !== 'granted') return;
+
+        // Recupera VAPID public key dal server
+        const res = await this.apiCall({ action: 'get_vapid_key', user_id: this.user.telegramId });
+        const vapidKey = res?.vapid_public_key;
+        if (!vapidKey) return;
+
+        sub = await reg.pushManager.subscribe({
+          userVisibleOnly: true,
+          applicationServerKey: this._urlBase64ToUint8Array(vapidKey),
+        });
+      }
+
+      // Invia/aggiorna subscription al server
+      const subJson = sub.toJSON();
+      await fetch('app_api.php', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        body: new URLSearchParams({
+          action:   'save_push_subscription',
+          user_id:  this.user.telegramId,
+          endpoint: subJson.endpoint,
+          p256dh:   subJson.keys.p256dh,
+          auth:     subJson.keys.auth,
+        }),
+      });
+      console.log('[PUSH] Subscription salvata');
+    } catch(e) {
+      console.warn('[PUSH] Errore iscrizione:', e.message);
+    }
+  },
+
+  _urlBase64ToUint8Array(base64String) {
+    const padding = '='.repeat((4 - base64String.length % 4) % 4);
+    const base64  = (base64String + padding).replace(/-/g,'+').replace(/_/g,'/');
+    const rawData = window.atob(base64);
+    return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
   },
 
   // ── MAPPA COLONNINE OCM CON FUZZY MATCHING DAL BACKEND ──

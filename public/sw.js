@@ -1,10 +1,10 @@
-const CACHE_NAME = 'foxsync-v75';
+const CACHE_NAME = 'foxsync-v76';
 const ASSETS = [
   './',
-  './index.html?v=75',
-  './style.css?v=75',
-  './app.js?v=75',
-  './manifest.json?v=75',
+  './index.html?v=76',
+  './style.css?v=76',
+  './app.js?v=76',
+  './manifest.json?v=76',
   'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/index.global.js',
   'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/Crypto1.global.js',
   'https://cdn.jsdelivr.net/npm/chameleon-ultra.js@0/dist/plugin/WebbleAdapter.global.js'
@@ -26,6 +26,38 @@ self.addEventListener('activate', event => {
           .map(key => caches.delete(key))
       );
     }).then(() => self.clients.claim())
+  );
+});
+
+// ── WEB PUSH: ricevi notifiche dal server ──
+self.addEventListener('push', event => {
+  if (!event.data) return;
+  let data = {};
+  try { data = event.data.json(); } catch(e) { data = { title: 'FoxSync', body: event.data.text() }; }
+
+  const title   = data.title || 'FoxSync';
+  const options = {
+    body:    data.body  || '',
+    icon:    './manifest.json',
+    badge:   './manifest.json',
+    tag:     data.tag   || 'foxsync',
+    data:    { url: data.url || './' },
+    vibrate: [100, 50, 100],
+    actions: data.url ? [{ action: 'open', title: '📖 Apri' }] : [],
+  };
+  event.waitUntil(self.registration.showNotification(title, options));
+});
+
+// Tap sulla notifica → apri/porta in primo piano l'app
+self.addEventListener('notificationclick', event => {
+  event.notification.close();
+  const url = event.notification.data?.url || './';
+  event.waitUntil(
+    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
+      const existing = list.find(c => c.url.includes('foxsync.cards') && 'focus' in c);
+      if (existing) return existing.focus();
+      return clients.openWindow(url);
+    })
   );
 });
 
