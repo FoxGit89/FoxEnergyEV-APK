@@ -155,7 +155,6 @@ const app = {
       this.showScreen('dashboard-screen');
       this._initMiniMap();
       this._initCarousel();
-      this._renderGestori();
       setTimeout(() => this._initPush(), 2000);
     } catch(e) { console.error(e); alert(`Errore:\n${e.message||'Connessione fallita.'}`); this.logout(); }
   },
@@ -1199,9 +1198,10 @@ const secureSession = {
     if (notes && noteWrap && noteEl) { noteEl.textContent = notes; noteWrap.style.display = 'block'; }
     else if (noteWrap) { noteWrap.style.display = 'none'; }
 
-    const slotLabel = encodeURIComponent(this._fbSelectedSlot?.label || '');
-    const opLabel   = encodeURIComponent(this._fbSelectedOp || '');
-    document.getElementById('fb-tg-link').href = `https://t.me/Fox_Ev_bot?start=consumo_${slotLabel}_${opLabel}`;
+    // Sanitize identico al PHP: solo [a-zA-Z0-9], poi parametro ?start=
+    const _san = s => (s||'').replace(/[^a-zA-Z0-9]/g, '');
+    const startParam = 'consumo_' + _san(this._fbSelectedSlot?.label) + '_' + _san(this._fbSelectedOp);
+    document.getElementById('fb-tg-link').href = `https://t.me/Fox_Ev_bot?start=${startParam}`;
 
     document.getElementById('fb-step2').classList.add('hidden');
     document.getElementById('fb-step3').classList.remove('hidden');

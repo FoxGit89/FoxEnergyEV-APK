@@ -92,50 +92,45 @@
         <span class="tg-bot-arrow">›</span>
       </a>
 
-      <!-- Widget Mappa Colonnine (Sostituisce i gestori compatibili) -->
+      <!-- Widget Mappa Colonnine -->
       <div class="dash-map-widget" onclick="app.showMap()">
         <div id="dash-mini-map" class="dash-mini-map"></div>
         <div class="dash-map-overlay">
-          <div class="dash-map-text">📍 Tocca per aprire la Mappa Colonnine</div>
+          <div class="dash-map-label">
+            <span class="dash-map-icon">📍</span>
+            <span class="dash-map-label-text">Mappa Colonnine</span>
+          </div>
+          <div class="dash-map-cta">Tocca per aprire →</div>
         </div>
       </div>
 
       <!-- Carosello istruzioni (occupa lo spazio rimanente) -->
-    <!-- Reti di ricarica compatibili -->
-    <div id="dash-gestori-section" class="dash-gestori-section hidden">
-      <div class="dash-gestori-header">
-        <span class="dash-gestori-title">⚡ Reti compatibili</span>
-        <span id="dash-gestori-count" class="dash-gestori-badge"></span>
-      </div>
-      <div id="dash-gestori-track" class="dash-gestori-track"></div>
-      <div class="dash-gestori-legend">
-        <div class="dash-gestori-legend-item"><span class="dash-gestori-uses used" style="font-size:9px;padding:1px 5px">3×</span>n. utilizzi confermati</div>
-        <div class="dash-gestori-legend-item"><span class="dash-gestori-dot new" style="width:9px;height:9px;border-radius:3px;display:inline-block"></span>mai usata</div>
-      </div>
-    </div>
-
       <div class="how-to-section">
         <div class="how-to-carousel-wrap">
           <div class="how-to-carousel" id="how-to-carousel">
             <div class="how-to-slide">
-              <div class="slide-num">1</div>
-              <div class="slide-title">🦊 Collega il Chameleon</div>
-              <div class="slide-desc">Premi il pulsante. Il dispositivo viene pulito e puoi scegliere le tessere da caricare.</div>
+              <div class="slide-step">PASSO 1 / 4</div>
+              <div class="slide-emoji">🔗</div>
+              <div class="slide-title">Collega il Chameleon</div>
+              <div class="slide-desc">Premi <b>Collega Chameleon Ultra</b> qui sotto. Il dispositivo viene pulito automaticamente prima del caricamento.</div>
             </div>
             <div class="how-to-slide">
-              <div class="slide-num">2</div>
-              <div class="slide-title">🦊 Seleziona e sincronizza</div>
-              <div class="slide-desc">Assegna le tessere RFID agli slot e avvia la sincronizzazione.</div>
+              <div class="slide-step">PASSO 2 / 4</div>
+              <div class="slide-emoji">💳</div>
+              <div class="slide-title">Scegli le tessere</div>
+              <div class="slide-desc">Assegna fino a <b>3 tessere RFID</b> agli slot 1, 5, 8 e avvia la sincronizzazione Bluetooth.</div>
             </div>
             <div class="how-to-slide">
-              <div class="slide-num">3</div>
-              <div class="slide-title">🦊 Usa — hai 60 secondi</div>
-              <div class="slide-desc">Avvicinati alla colonnina. Alla scadenza gli slot vengono cancellati in automatico.</div>
+              <div class="slide-step">PASSO 3 / 4</div>
+              <div class="slide-emoji">⚡</div>
+              <div class="slide-title">Hai 60 secondi</div>
+              <div class="slide-desc">Avvicinati alla colonnina e avvia la ricarica. Allo scadere, gli slot vengono <b>cancellati automaticamente</b>.</div>
             </div>
-            <div class="how-to-slide warn">
-              <div class="slide-num">⚠️</div>
-              <div class="slide-title">Tieni il telefono vicino</div>
-              <div class="slide-desc">Non chiudere l'app. Se BT si disconnette gli admin vengono avvisati.</div>
+            <div class="how-to-slide how-to-slide-warn">
+              <div class="slide-step">IMPORTANTE</div>
+              <div class="slide-emoji">📵</div>
+              <div class="slide-title">Non chiudere l'app</div>
+              <div class="slide-desc">Mantieni il Bluetooth attivo e il telefono vicino al Chameleon per tutta la durata della sessione.</div>
             </div>
           </div>
         </div>
@@ -486,30 +481,41 @@
 
       <!-- STEP 3: Conferma e apri bot -->
       <div id="fb-step3" class="fb-step hidden">
-        <div style="text-align:center;margin-bottom:20px">
-          <div style="font-size:56px;margin-bottom:12px">✅</div>
-          <div class="fb-step-title" style="text-align:center">Ottimo, grazie!</div>
-          <div class="fb-step-sub" style="text-align:center;margin-top:8px">
-            Hai usato: <strong id="fb-summary-slot" style="color:#FF9800"></strong><br>
-            Operatore: <strong id="fb-summary-op" style="color:#4CAF50"></strong>
+
+        <!-- Riepilogo dati -->
+        <div class="fb3-summary">
+          <div class="fb3-check">✅</div>
+          <div class="fb3-title">Ottimo, grazie!</div>
+          <div class="fb3-row">
+            <span class="fb3-lbl">📟 Tessera</span>
+            <strong id="fb-summary-slot" class="fb3-val-slot"></strong>
           </div>
-          <div id="fb-summary-note-wrap" style="display:none;margin-top:8px;background:rgba(255,255,255,0.05);border-radius:10px;padding:8px 12px">
-            <div style="font-size:11px;color:var(--text-muted,rgba(255,255,255,0.6))">Note:</div>
-            <div id="fb-summary-note" style="font-size:13px;color:rgba(255,255,255,0.8);margin-top:2px"></div>
+          <div class="fb3-row">
+            <span class="fb3-lbl">🔌 Operatore</span>
+            <strong id="fb-summary-op" class="fb3-val-op"></strong>
+          </div>
+          <div id="fb-summary-note-wrap" class="fb3-note-wrap" style="display:none">
+            <span class="fb3-lbl">📝 Note</span>
+            <span id="fb-summary-note" class="fb3-note-text"></span>
           </div>
         </div>
-        <div style="background:rgba(41,182,246,0.08);border:1px solid rgba(41,182,246,0.25);border-radius:14px;padding:16px;margin-bottom:16px">
-          <div style="color:#29B6F6;font-size:13px;font-weight:700;margin-bottom:8px">📋 Hai terminato la ricarica?</div>
-          <div style="color:rgba(255,255,255,0.7);font-size:12px;line-height:1.6;margin-bottom:14px">
-            Ricordati di dichiarare il consumo nel bot Telegram.
+
+        <!-- CTA dichiarazione consumo -->
+        <div class="fb3-declare-box">
+          <div class="fb3-declare-title">⚡ Dichiara il consumo</div>
+          <div class="fb3-declare-desc">
+            Apri il bot con i dati già precompilati — dovrai inserire solo i <strong>kWh</strong> e la <strong>foto</strong> del display.
           </div>
-          <a id="fb-tg-link" href="https://t.me/Fox_Ev_bot" target="_blank"
-            style="display:flex;align-items:center;justify-content:center;gap:10px;background:#29B6F6;color:white;border-radius:12px;padding:14px;text-decoration:none;font-weight:700;font-size:14px">
-            ✈️ Apri Fox EV Bot su Telegram
+          <a id="fb-tg-link" href="https://t.me/Fox_Ev_bot" target="_blank" class="fb3-tg-btn">
+            <span style="font-size:20px">✈️</span>
+            <span>Apri Fox EV Bot e dichiara</span>
+            <span style="opacity:0.7;font-size:12px">→</span>
           </a>
+          <div class="fb3-tg-hint">Tessera e operatore saranno già inseriti</div>
         </div>
-        <button class="btn-primary" onclick="secureSession._fbFinish()">
-          🏁 Torna alla Dashboard
+
+        <button class="btn-secondary" onclick="secureSession._fbFinish()" style="margin-top:8px">
+          Torna alla Dashboard
         </button>
       </div>
 
