@@ -418,11 +418,8 @@ try {
 ";
                         if (!empty($notes)) $tg .= "📝 Note: " . htmlspecialchars($notes) . "
 ";
-                        $tg .= "
-👉 <a href="https://t.me/Fox_Ev_bot?start={$sp}">Dichiara il consumo ora →</a>
-";
-                        $tg .= "
-<i>Tocca il link per aprire il bot con i dati già precompilati.</i>";
+                        $tg .= "\n👉 <a href=\"https://t.me/Fox_Ev_bot?start={$sp}\">Dichiara il consumo ora →</a>\n";
+                        $tg .= "\n<i>Tocca il link per aprire il bot con i dati già precompilati.</i>";
                         @file_get_contents(
                             "https://api.telegram.org/bot{$token}/sendMessage"
                             . "?chat_id="  . urlencode($user['telegram_id'])
