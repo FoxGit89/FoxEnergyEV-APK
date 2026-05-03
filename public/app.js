@@ -310,70 +310,78 @@ const app = {
     return parts[0].slice(0,2).toUpperCase();
   },
 
+  // ── GESTORI COMPATIBILI DASHBOARD ──
+  _renderGestori() {
+    const section = document.getElementById('dash-gestori-section');
+    const track   = document.getElementById('dash-gestori-track');
+    const badge   = document.getElementById('dash-gestori-count');
+    if (!section || !track || !this.cards || !this.cards.length) return;
+
+    const opsMap = {};
+    (this.cards||[]).forEach(card => {
+      (card.roaming_detail||[]).forEach(r => {
+        const key = r.operator_name;
+        if (!opsMap[key]) opsMap[key] = { usage_count:0 };
+        opsMap[key].usage_count += parseInt(r.usage_count)||0;
+      });
+    });
+
+    const ops = Object.entries(opsMap)
+      .map(([name,d]) => ({name, ...d}))
+      .sort((a,b) => b.usage_count - a.usage_count);
+
+    if (!ops.length) return;
+
+    badge.textContent = ops.length + (ops.length===1?' rete':' reti');
+    track.innerHTML = ops.map(op => {
+      const col  = this._opColor(op.name);
+      const ini  = this._opInitials(op.name);
+      const used = op.usage_count > 0;
+      return `<div class="dash-gestori-tile">
+        <div class="dash-gestori-avatar${used?'':' unused'}" style="${used?'background:'+col.grad:''}">${this._esc(ini)}</div>
+        <div class="dash-gestori-name${used?'':' unused'}" title="${this._esc(op.name)}">${this._esc(op.name)}</div>
+        <div class="dash-gestori-uses${used?' used':' unused'}">${used ? op.usage_count+'×' : '0×'}</div>
+      </div>`;
+    }).join('');
+
+    section.classList.remove('hidden');
+  },
+
   // ── WEB PUSH NOTIFICATIONS ──
   async _initPush() {
-    // Controlla supporto browser
-    if (!('Notification' in window) || !('serviceWorker' in navigator) || !('PushManager' in window)) {
-      console.log('[PUSH] Non supportato su questo browser/dispositivo');
-      return;
-    }
-
-    // Su iOS: funziona solo se installata come PWA (standalone)
+    if (!('Notification' in window)||!('serviceWorker' in navigator)||!('PushManager' in window)) return;
     const isIOS = /iphone|ipad|ipod/i.test(navigator.userAgent);
-    if (isIOS && !window.navigator.standalone) {
-      console.log('[PUSH] iOS: aggiungi alla schermata Home per le notifiche');
-      return;
-    }
-
-    // Controlla permesso attuale
+    if (isIOS && !window.navigator.standalone) return;
     if (Notification.permission === 'denied') return;
-
     try {
       const reg = await navigator.serviceWorker.ready;
-
-      // Già iscritto?
       let sub = await reg.pushManager.getSubscription();
-
       if (!sub) {
-        // Chiedi permesso e iscrivi
-        const permission = await Notification.requestPermission();
-        if (permission !== 'granted') return;
-
-        // Recupera VAPID public key dal server
-        const res = await this.apiCall({ action: 'get_vapid_key', user_id: this.user.telegramId });
-        const vapidKey = res?.vapid_public_key;
-        if (!vapidKey) return;
-
+        const perm = await Notification.requestPermission();
+        if (perm !== 'granted') return;
+        const res = await this.apiCall({action:'get_vapid_key', user_id:this.user.telegramId});
+        if (!res?.vapid_public_key) return;
         sub = await reg.pushManager.subscribe({
           userVisibleOnly: true,
-          applicationServerKey: this._urlBase64ToUint8Array(vapidKey),
+          applicationServerKey: this._urlBase64ToUint8Array(res.vapid_public_key),
         });
       }
-
-      // Invia/aggiorna subscription al server
       const subJson = sub.toJSON();
       await fetch('app_api.php', {
         method: 'POST',
-        headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+        headers: {'Content-Type':'application/x-www-form-urlencoded'},
         body: new URLSearchParams({
-          action:   'save_push_subscription',
-          user_id:  this.user.telegramId,
-          endpoint: subJson.endpoint,
-          p256dh:   subJson.keys.p256dh,
-          auth:     subJson.keys.auth,
+          action:'save_push_subscription', user_id:this.user.telegramId,
+          endpoint:subJson.endpoint, p256dh:subJson.keys.p256dh, auth:subJson.keys.auth,
         }),
       });
-      console.log('[PUSH] Subscription salvata');
-    } catch(e) {
-      console.warn('[PUSH] Errore iscrizione:', e.message);
-    }
+    } catch(e) { console.warn('[PUSH]',e.message); }
   },
 
-  _urlBase64ToUint8Array(base64String) {
-    const padding = '='.repeat((4 - base64String.length % 4) % 4);
-    const base64  = (base64String + padding).replace(/-/g,'+').replace(/_/g,'/');
-    const rawData = window.atob(base64);
-    return Uint8Array.from([...rawData].map(c => c.charCodeAt(0)));
+  _urlBase64ToUint8Array(b64) {
+    const pad = '='.repeat((4-b64.length%4)%4);
+    const raw = window.atob((b64+pad).replace(/-/g,'+').replace(/_/g,'/'));
+    return Uint8Array.from([...raw].map(c=>c.charCodeAt(0)));
   },
 
   // ── MAPPA COLONNINE OCM CON FUZZY MATCHING DAL BACKEND ──

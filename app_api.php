@@ -386,27 +386,7 @@ try {
     }
 
     // ── SESSIONE CHAMELEON ──
-    // Migrazioni automatiche colonne survey e tabella push
-    try {
-        $hasSurvey = db()->query("SHOW COLUMNS FROM chameleon_sessions LIKE 'survey_slot_used'")->fetchAll();
-        if (empty($hasSurvey)) {
-            db()->exec("ALTER TABLE chameleon_sessions
-                ADD COLUMN survey_slot_used    VARCHAR(255) DEFAULT NULL,
-                ADD COLUMN survey_operator     VARCHAR(255) DEFAULT NULL,
-                ADD COLUMN survey_notes        TEXT         DEFAULT NULL,
-                ADD COLUMN survey_completed_at DATETIME     DEFAULT NULL");
-        } else {
-            $hasNotes = db()->query("SHOW COLUMNS FROM chameleon_sessions LIKE 'survey_notes'")->fetchAll();
-            if (empty($hasNotes))
-                db()->exec("ALTER TABLE chameleon_sessions ADD COLUMN survey_notes TEXT DEFAULT NULL AFTER survey_operator");
-        }
-        db()->exec("CREATE TABLE IF NOT EXISTS push_subscriptions (
-            id INT AUTO_INCREMENT PRIMARY KEY, user_id BIGINT NOT NULL,
-            endpoint TEXT NOT NULL, p256dh VARCHAR(255) NOT NULL, auth VARCHAR(255) NOT NULL,
-            created_at DATETIME DEFAULT NOW(), UNIQUE KEY uq_ep (endpoint(200))
-        ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4");
-    } catch(Exception $e) {}
-
+    // ── WEB PUSH ──
     if ($action === 'get_vapid_key') {
         echo json_encode(['vapid_public_key' => getenv('VAPID_PUBLIC_KEY') ?: '']);
         exit;
@@ -420,51 +400,29 @@ try {
                 ON DUPLICATE KEY UPDATE user_id=VALUES(user_id),p256dh=VALUES(p256dh),auth=VALUES(auth),created_at=NOW()")
                 ->execute([$user['telegram_id'],$endpoint,$p256dh,$auth]);
             echo json_encode(['success'=>true]);
-        } catch(Exception $e) { echo json_encode(['error'=>$e->getMessage()]); }
-        exit;
-    }
 
-    if ($action === 'save_session_survey') {
-        $session_id = (int)($_GET['session_id'] ?? 0);
-        $slot_used  = trim($_GET['slot_used']   ?? '');
-        $operator   = trim($_GET['operator']    ?? '');
-        $notes      = trim($_GET['notes']       ?? '');
-        if (!$session_id) { echo json_encode(['error'=>'session_id mancante']); exit; }
-        try {
-            $chk = db()->prepare("SELECT id FROM chameleon_sessions WHERE id=? AND (user_id=? OR telegram_id=?) LIMIT 1");
-            $chk->execute([$session_id,$user['id']??0,$user['telegram_id']??'']);
-            if (!$chk->fetch()) { echo json_encode(['error'=>'Sessione non trovata']); exit; }
-            db()->prepare("UPDATE chameleon_sessions SET survey_slot_used=?,survey_operator=?,survey_notes=?,survey_completed_at=NOW() WHERE id=?")
-                ->execute([$slot_used?:null,$operator?:null,$notes?:null,$session_id]);
-            echo json_encode(['success'=>true]);
-
-            // Invia messaggio Telegram supplementare con dati survey (se l'utente ha dichiarato l'uso)
-            // Questo arriva DOPO il riepilogo sessione, quando l'utente ha completato il feedback
+            // Invia messaggio Telegram con dati ricarica + deep link se slot usato
             if (!empty($slot_used) && !empty($operator)) {
                 try {
                     $token = getenv('BOT_TOKEN');
                     if ($token && !empty($user['telegram_id'])) {
-                        $sp = 'consumo';
-                        $sp .= '_' . preg_replace('/[^a-zA-Z0-9]/', '', $slot_used);
-                        $sp .= '_' . preg_replace('/[^a-zA-Z0-9]/', '', $operator);
-
-                        $tg = "⚡ <b>Dati ricarica confermati!</b>
+                        $sp = 'consumo'
+                            . '_' . preg_replace('/[^a-zA-Z0-9]/', '', $slot_used)
+                            . '_' . preg_replace('/[^a-zA-Z0-9]/', '', $operator);
+                        $tg  = "⚡ <b>Dati ricarica confermati!</b>
 
 ";
                         $tg .= "📟 Tessera: <b>" . htmlspecialchars($slot_used) . "</b>
 ";
                         $tg .= "🔌 Gestore: <b>" . htmlspecialchars($operator) . "</b>
 ";
-                        if (!empty($notes)) {
-                            $tg .= "📝 Note: " . htmlspecialchars($notes) . "
+                        if (!empty($notes)) $tg .= "📝 Note: " . htmlspecialchars($notes) . "
 ";
-                        }
                         $tg .= "
 👉 <a href="https://t.me/Fox_Ev_bot?start={$sp}">Dichiara il consumo ora →</a>
 ";
                         $tg .= "
-<i>Tocca il link sopra per aprire il bot con i dati già precompilati.</i>";
-
+<i>Tocca il link per aprire il bot con i dati già precompilati.</i>";
                         @file_get_contents(
                             "https://api.telegram.org/bot{$token}/sendMessage"
                             . "?chat_id="  . urlencode($user['telegram_id'])
@@ -476,6 +434,49 @@ try {
                 } catch(Exception $e) {}
             }
         } catch(Exception $e) { echo json_encode(['error'=>$e->getMessage()]); }
+        exit;
+    }
+
+    // ── SURVEY POST-SESSIONE ──
+    if ($action === 'save_session_survey') {
+        $session_id = (int)($_GET['session_id'] ?? 0);
+        $slot_used  = trim($_GET['slot_used']   ?? '');
+        $operator   = trim($_GET['operator']    ?? '');
+        $notes      = trim($_GET['notes']       ?? '');
+
+        if (!$session_id) {
+            echo json_encode(['error' => 'session_id mancante']);
+            exit;
+        }
+        try {
+            $chk = db()->prepare("
+                SELECT id FROM chameleon_sessions
+                WHERE id = ? AND (user_id = ? OR telegram_id = ?)
+                LIMIT 1
+            ");
+            $chk->execute([$session_id, $user['id'] ?? 0, $user['telegram_id'] ?? '']);
+            if (!$chk->fetch()) {
+                echo json_encode(['error' => 'Sessione non trovata']);
+                exit;
+            }
+            $upd = db()->prepare("
+                UPDATE chameleon_sessions
+                SET survey_slot_used    = ?,
+                    survey_operator     = ?,
+                    survey_notes        = ?,
+                    survey_completed_at = NOW()
+                WHERE id = ?
+            ");
+            $upd->execute([
+                $slot_used ?: null,
+                $operator  ?: null,
+                $notes     ?: null,
+                $session_id
+            ]);
+            echo json_encode(['success' => true]);
+        } catch(Exception $e) {
+            echo json_encode(['error' => $e->getMessage()]);
+        }
         exit;
     }
 
@@ -510,6 +511,24 @@ try {
                         ADD COLUMN latitude DECIMAL(10,6) DEFAULT NULL AFTER ip_address,
                         ADD COLUMN longitude DECIMAL(10,6) DEFAULT NULL AFTER latitude,
                         ADD COLUMN geo_accuracy INT DEFAULT NULL AFTER longitude");
+                }
+            } catch(Exception $e) {}
+
+            // Migrazione colonne survey post-sessione
+            try {
+                $hasSurvey = db()->query("SHOW COLUMNS FROM chameleon_sessions LIKE 'survey_slot_used'")->fetchAll();
+                if (empty($hasSurvey)) {
+                    db()->exec("ALTER TABLE chameleon_sessions
+                        ADD COLUMN survey_slot_used    VARCHAR(255) DEFAULT NULL AFTER geo_accuracy,
+                        ADD COLUMN survey_operator     VARCHAR(255) DEFAULT NULL AFTER survey_slot_used,
+                        ADD COLUMN survey_notes        TEXT         DEFAULT NULL AFTER survey_operator,
+                        ADD COLUMN survey_completed_at DATETIME     DEFAULT NULL AFTER survey_notes");
+                } else {
+                    // Aggiunge survey_notes se mancante (upgrade)
+                    $hasNotes = db()->query("SHOW COLUMNS FROM chameleon_sessions LIKE 'survey_notes'")->fetchAll();
+                    if (empty($hasNotes)) {
+                        db()->exec("ALTER TABLE chameleon_sessions ADD COLUMN survey_notes TEXT DEFAULT NULL AFTER survey_operator");
+                    }
                 }
             } catch(Exception $e) {}
         } catch(Exception $e) {}
@@ -669,19 +688,7 @@ try {
 
                     $token = getenv('BOT_TOKEN');
                     if ($token && !empty($user['telegram_id'])) {
-
-                        // Leggi survey (compilata dalla webapp in modo asincrono)
-                        $survey = null;
-                        try {
-                            $sq = db()->prepare("SELECT survey_slot_used,survey_operator,survey_notes
-                                FROM chameleon_sessions WHERE user_id=? AND status='ended'
-                                ORDER BY ended_at DESC LIMIT 1");
-                            $sq->execute([$user_id]);
-                            $survey = $sq->fetch(PDO::FETCH_ASSOC);
-                        } catch(Exception $e) {}
-
                         $dur_fmt = $dur >= 60 ? floor($dur/60).'min '.($dur%60).'s' : $dur.'s';
-
                         $msg  = "🦊 <b>FoxSync — Riepilogo Sessione</b>
 
 ";
@@ -690,45 +697,18 @@ try {
                         $msg .= "📋 <b>Chiusura:</b> {$reason_label}
 
 ";
-
                         $slot_list = array_filter(array_map('trim', explode(',', $slots_used)));
                         if (!empty($slot_list)) {
                             $msg .= "💾 <b>Tessere caricate:</b>
 ";
-                            foreach ($slot_list as $s) $msg .= "   • " . htmlspecialchars($s) . "
+                            foreach ($slot_list as $sl) $msg .= "   • " . htmlspecialchars($sl) . "
 ";
                             $msg .= "
 ";
                         }
-
                         $msg .= "━━━━━━━━━━━━━━━
 ";
-                        $has_survey = !empty($survey['survey_slot_used']) || !empty($survey['survey_operator']);
-                        if ($has_survey) {
-                            $msg .= "⚡ <b>Dati ricarica dichiarati:</b>
-";
-                            if (!empty($survey['survey_slot_used']))
-                                $msg .= "   📟 Tessera: <b>" . htmlspecialchars($survey['survey_slot_used']) . "</b>
-";
-                            if (!empty($survey['survey_operator']))
-                                $msg .= "   🔌 Gestore: <b>" . htmlspecialchars($survey['survey_operator']) . "</b>
-";
-                            if (!empty($survey['survey_notes']))
-                                $msg .= "   📝 Note: " . htmlspecialchars($survey['survey_notes']) . "
-";
-                            $msg .= "
-";
-                            $sp = 'consumo';
-                            if (!empty($survey['survey_slot_used']))
-                                $sp .= '_' . preg_replace('/[^a-zA-Z0-9]/', '', $survey['survey_slot_used']);
-                            if (!empty($survey['survey_operator']))
-                                $sp .= '_' . preg_replace('/[^a-zA-Z0-9]/', '', $survey['survey_operator']);
-                            $msg .= "👉 <a href="https://t.me/Fox_Ev_bot?start={$sp}">Dichiara il consumo ora →</a>";
-                        } else {
-                            // Survey non ancora compilata — il link arriverà nel messaggio successivo
-                            $msg .= "📱 Compila il questionario nella webapp per dichiarare il consumo velocemente.";
-                        }
-
+                        $msg .= "📱 Compila il questionario nella webapp per dichiarare il consumo.";
                         @file_get_contents(
                             "https://api.telegram.org/bot{$token}/sendMessage"
                             . "?chat_id="  . urlencode($user['telegram_id'])

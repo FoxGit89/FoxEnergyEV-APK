@@ -29,38 +29,6 @@ self.addEventListener('activate', event => {
   );
 });
 
-// ── WEB PUSH: ricevi notifiche dal server ──
-self.addEventListener('push', event => {
-  if (!event.data) return;
-  let data = {};
-  try { data = event.data.json(); } catch(e) { data = { title: 'FoxSync', body: event.data.text() }; }
-
-  const title   = data.title || 'FoxSync';
-  const options = {
-    body:    data.body  || '',
-    icon:    './manifest.json',
-    badge:   './manifest.json',
-    tag:     data.tag   || 'foxsync',
-    data:    { url: data.url || './' },
-    vibrate: [100, 50, 100],
-    actions: data.url ? [{ action: 'open', title: '📖 Apri' }] : [],
-  };
-  event.waitUntil(self.registration.showNotification(title, options));
-});
-
-// Tap sulla notifica → apri/porta in primo piano l'app
-self.addEventListener('notificationclick', event => {
-  event.notification.close();
-  const url = event.notification.data?.url || './';
-  event.waitUntil(
-    clients.matchAll({ type: 'window', includeUncontrolled: true }).then(list => {
-      const existing = list.find(c => c.url.includes('foxsync.cards') && 'focus' in c);
-      if (existing) return existing.focus();
-      return clients.openWindow(url);
-    })
-  );
-});
-
 self.addEventListener('fetch', event => {
   // Non cachare: API PHP e richieste POST (es. Overpass)
   if (event.request.url.includes('app_api.php') || event.request.method === 'POST') {
