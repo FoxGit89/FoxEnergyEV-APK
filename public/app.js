@@ -14,12 +14,33 @@ const app = {
   mapping:   { 1:null, 2:null, 3:null, 4:null, 5:null, 6:null, 7:null, 8:null },
   currentSlotSelection: null,
 
-  _isChrome() {
-    const ua = navigator.userAgent;
-    const isChrome = /Chrome\//.test(ua) && !/Edg\//.test(ua) && !/OPR\//.test(ua) && !/SamsungBrowser\//.test(ua);
-    const hasBluetooth = !!navigator.bluetooth;
-    return isChrome && hasBluetooth;
+  // ── Rilevamento browser / piattaforma ──
+  _detectBrowser() {
+    const ua  = navigator.userAgent;
+    const hasBT = !!navigator.bluetooth;
+    const isIOS     = /iphone|ipad|ipod/i.test(ua);
+    const isAndroid = /android/i.test(ua);
+    const isBluefy  = /Bluefy/i.test(ua);
+    const isChrome  = /Chrome\//.test(ua) && !/Edg\//.test(ua) && !/OPR\//.test(ua) && !/SamsungBrowser\//.test(ua);
+    const isSafari  = /^((?!chrome|android).)*safari/i.test(ua);
+    const isDesktop = !isIOS && !isAndroid;
+
+    return { ua, hasBT, isIOS, isAndroid, isBluefy, isChrome, isSafari, isDesktop };
   },
+
+  _isBleSupported() {
+    const { hasBT, isIOS, isAndroid, isBluefy, isChrome, isDesktop } = this._detectBrowser();
+    // Bluefy su iOS: unico browser iOS con WebBLE reale
+    if (isIOS && isBluefy && hasBT) return true;
+    // Chrome su Android: supporto nativo
+    if (isAndroid && isChrome && hasBT) return true;
+    // Chrome su Desktop (macOS/Windows con BT abilitato)
+    if (isDesktop && isChrome && hasBT) return true;
+    return false;
+  },
+
+  // Alias mantenuto per retrocompatibilità interna
+  _isChrome() { return this._isBleSupported(); },
 
   init() {
     // Verifica Chrome con Web Bluetooth prima di tutto
@@ -35,27 +56,69 @@ const app = {
   },
 
   _showBrowserError() {
-    // Mostra schermata di errore browser al posto del login
-    document.body.innerHTML = `
-      <div style="
-        min-height:100vh; background:#111; display:flex; flex-direction:column;
-        align-items:center; justify-content:center; text-align:center; padding:30px;
-        font-family:-apple-system,sans-serif; color:white;">
-        <div style="font-size:72px;margin-bottom:24px">🦊</div>
-        <h1 style="font-size:22px;font-weight:900;margin-bottom:12px">Browser non supportato</h1>
-        <p style="color:rgba(255,255,255,0.65);font-size:15px;line-height:1.7;max-width:320px;margin-bottom:32px">
-          FoxSync richiede <strong>Google Chrome</strong> su Android per il supporto Bluetooth.<br><br>
-          Apri questa pagina con Chrome e riprova.
-        </p>
-        <a href="https://play.google.com/store/apps/details?id=com.android.chrome"
-           style="background:#FF9800;color:white;padding:14px 28px;border-radius:14px;
-                  text-decoration:none;font-weight:700;font-size:15px;letter-spacing:0.5px">
-          Scarica Google Chrome
+    const { isIOS, isAndroid, isBluefy, isDesktop } = this._detectBrowser();
+
+    // Contenuto contestuale per piattaforma
+    let icon, title, desc, btnHtml;
+
+    if (isIOS && !isBluefy) {
+      // iPhone/iPad con browser sbagliato — suggerisci Bluefy
+      icon  = '🦊';
+      title = 'Usa Bluefy su iPhone';
+      desc  = `Su iPhone il Bluetooth Web non è supportato da Safari.<br><br>
+               Scarica <strong>Bluefy – WebBLE Browser</strong> dall'App Store,
+               poi apri <strong>foxsync.cards</strong> da Bluefy.`;
+      btnHtml = `
+        <a href="https://apps.apple.com/app/bluefy-web-ble-browser/id1492822055"
+           style="display:block;background:#FF9800;color:white;padding:14px 28px;
+                  border-radius:14px;text-decoration:none;font-weight:700;
+                  font-size:15px;letter-spacing:0.5px;margin-bottom:12px">
+          📲 Scarica Bluefy dall'App Store
         </a>
-        <p style="color:rgba(255,255,255,0.35);font-size:12px;margin-top:24px">
-          foxsync.cards
-        </p>
-      </div>`;
+        <p style="color:rgba(255,255,255,0.45);font-size:12px;margin-top:4px">
+          Bluefy è gratuito — cerca "Bluefy WebBLE"
+        </p>`;
+    } else if (isAndroid) {
+      // Android con browser sbagliato
+      icon  = '🦊';
+      title = 'Apri con Chrome';
+      desc  = `FoxSync richiede <strong>Google Chrome</strong> su Android
+               per il supporto Bluetooth.<br><br>Apri questa pagina con Chrome e riprova.`;
+      btnHtml = `
+        <a href="https://play.google.com/store/apps/details?id=com.android.chrome"
+           style="display:block;background:#FF9800;color:white;padding:14px 28px;
+                  border-radius:14px;text-decoration:none;font-weight:700;
+                  font-size:15px;letter-spacing:0.5px">
+          Scarica Google Chrome
+        </a>`;
+    } else {
+      // Desktop o altro
+      icon  = '🦊';
+      title = 'Bluetooth non disponibile';
+      desc  = `FoxSync richiede un browser con supporto <strong>Web Bluetooth</strong>.<br><br>
+               Usa <strong>Google Chrome</strong> su Android oppure
+               <strong>Bluefy</strong> su iPhone.<br><br>
+               Su desktop assicurati che il Bluetooth sia attivo e usa Chrome.`;
+      btnHtml = `
+        <a href="https://foxsync.cards"
+           style="display:block;background:#FF9800;color:white;padding:14px 28px;
+                  border-radius:14px;text-decoration:none;font-weight:700;
+                  font-size:15px;letter-spacing:0.5px">
+          Riprova
+        </a>`;
+    }
+
+    document.body.innerHTML = [
+      '<div style="min-height:100vh;background:linear-gradient(135deg,#0d0d0d 0%,#1a0d00 100%);',
+      'display:flex;flex-direction:column;align-items:center;justify-content:center;',
+      'text-align:center;padding:30px;font-family:-apple-system,sans-serif;color:white">',
+      '<div style="font-size:72px;margin-bottom:20px">' + icon + '</div>',
+      '<h1 style="font-size:22px;font-weight:900;margin-bottom:14px">' + title + '</h1>',
+      '<p style="color:rgba(255,255,255,0.65);font-size:15px;line-height:1.75;max-width:320px;margin-bottom:28px">' + desc + '</p>',
+      btnHtml,
+      '<p style="color:rgba(255,255,255,0.3);font-size:11px;margin-top:28px;letter-spacing:0.5px">foxsync.cards</p>',
+      '</div>'
+    ].join('');
   },
 
   showScreen(id) {
